@@ -1,0 +1,2211 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MultiMonitor</title>
+<meta name="description" content="Portable multi-machine Windows performance dashboard">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%236d5efc'/%3E%3Cstop offset='1' stop-color='%2322d3ee'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='32' height='32' rx='8' fill='url(%23g)'/%3E%3Cpath d='M5 18h5l3-8 5 14 3-6h6' fill='none' stroke='white' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+<style>
+/* ------------------------------------------------------------------ tokens */
+:root {
+  color-scheme: light;
+  --bg: #eef1f8;
+  --bg-glow-1: rgba(109, 94, 252, .16);
+  --bg-glow-2: rgba(34, 211, 238, .14);
+  --bg-glow-3: rgba(244, 114, 182, .10);
+  --surface: #ffffff;           /* chart surface (palette validated against it) */
+  --surface-2: #f5f7fc;
+  --surface-3: #eceff7;
+  --glass: rgba(255, 255, 255, .72);
+  --text-1: #10131c;
+  --text-2: #4b5468;
+  --muted: #737b90;
+  --grid: #e6e9f1;
+  --axis: #c5cad6;
+  --border: rgba(16, 19, 28, .09);
+  --border-strong: rgba(16, 19, 28, .16);
+  --shadow: 0 1px 2px rgba(16, 19, 28, .05), 0 8px 24px -12px rgba(40, 50, 90, .18);
+  --accent-1: #6d5efc;
+  --accent-2: #22b8e0;
+  --accent-3: #e2589e;
+  --accent-grad: linear-gradient(135deg, var(--accent-1), var(--accent-2));
+  --ring: rgba(109, 94, 252, .45);
+  --ok-text: #006300;
+  --bad-text: #b42323;
+
+  --s1: #2a78d6; --s2: #eb6834; --s3: #1baf7a; --s4: #eda100;
+  --s5: #e87ba4; --s6: #008300; --s7: #4a3aa7; --s8: #e34948;
+
+  --good: #0ca30c; --warning: #fab219; --serious: #ec835a; --critical: #d03b3b;
+
+  --radius: 16px;
+  --radius-sm: 10px;
+  --font: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --bg: #080c18;
+    --bg-glow-1: rgba(109, 94, 252, .26);
+    --bg-glow-2: rgba(34, 211, 238, .14);
+    --bg-glow-3: rgba(226, 88, 158, .12);
+    --surface: #141a2e;
+    --surface-2: #1a2139;
+    --surface-3: #222a46;
+    --glass: rgba(12, 17, 33, .72);
+    --text-1: #f3f5fb;
+    --text-2: #b7bfd3;
+    --muted: #8189a3;
+    --grid: #222a44;
+    --axis: #353f60;
+    --border: rgba(255, 255, 255, .08);
+    --border-strong: rgba(255, 255, 255, .16);
+    --shadow: 0 1px 2px rgba(0, 0, 0, .3), 0 12px 32px -16px rgba(0, 0, 0, .7);
+    --ring: rgba(139, 128, 255, .6);
+    --ok-text: #2fc02f;
+    --bad-text: #ff7b7b;
+    --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500;
+    --s5: #d55181; --s6: #008300; --s7: #9085e9; --s8: #e66767;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #080c18;
+  --bg-glow-1: rgba(109, 94, 252, .26);
+  --bg-glow-2: rgba(34, 211, 238, .14);
+  --bg-glow-3: rgba(226, 88, 158, .12);
+  --surface: #141a2e;
+  --surface-2: #1a2139;
+  --surface-3: #222a46;
+  --glass: rgba(12, 17, 33, .72);
+  --text-1: #f3f5fb;
+  --text-2: #b7bfd3;
+  --muted: #8189a3;
+  --grid: #222a44;
+  --axis: #353f60;
+  --border: rgba(255, 255, 255, .08);
+  --border-strong: rgba(255, 255, 255, .16);
+  --shadow: 0 1px 2px rgba(0, 0, 0, .3), 0 12px 32px -16px rgba(0, 0, 0, .7);
+  --ring: rgba(139, 128, 255, .6);
+  --ok-text: #2fc02f;
+  --bad-text: #ff7b7b;
+  --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500;
+  --s5: #d55181; --s6: #008300; --s7: #9085e9; --s8: #e66767;
+}
+
+/* ------------------------------------------------------------------ base */
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+  margin: 0;
+  font: 14px/1.45 var(--font);
+  color: var(--text-1);
+  background:
+    radial-gradient(1100px 620px at 8% -12%, var(--bg-glow-1), transparent 62%),
+    radial-gradient(900px 520px at 100% -4%, var(--bg-glow-2), transparent 60%),
+    radial-gradient(900px 700px at 55% 118%, var(--bg-glow-3), transparent 62%),
+    var(--bg);
+  background-attachment: fixed;
+  -webkit-font-smoothing: antialiased;
+}
+button, input, select, textarea { font: inherit; color: inherit; }
+button { cursor: pointer; }
+:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.muted { color: var(--muted); }
+.mono { font-family: ui-monospace, "Cascadia Code", Consolas, monospace; font-size: 12px; }
+svg.i { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
+/* ------------------------------------------------------------------ layout */
+.app { display: grid; grid-template-columns: 300px minmax(0, 1fr); grid-template-rows: auto 1fr; min-height: 100vh; }
+.topbar {
+  grid-column: 1 / -1; position: sticky; top: 0; z-index: 20;
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  padding: 10px 18px; background: var(--glass);
+  backdrop-filter: saturate(1.6) blur(14px); -webkit-backdrop-filter: saturate(1.6) blur(14px);
+  border-bottom: 1px solid var(--border);
+}
+.brand { display: flex; align-items: center; gap: 10px; margin-right: 6px; }
+.brand-logo { width: 32px; height: 32px; border-radius: 9px; background: var(--accent-grad); display: grid; place-items: center; box-shadow: 0 6px 18px -6px var(--accent-1); }
+.brand-logo svg { width: 20px; height: 20px; stroke: #fff; stroke-width: 2.5; fill: none; stroke-linecap: round; stroke-linejoin: round; }
+.brand-name { font-weight: 700; font-size: 17px; letter-spacing: -.01em; background: linear-gradient(90deg, var(--text-1), var(--accent-1) 70%, var(--accent-2)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.cfg-name { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.cfg-name input { border: 1px solid transparent; background: transparent; border-radius: 8px; padding: 4px 8px; font-weight: 600; width: 220px; max-width: 32vw; text-overflow: ellipsis; }
+.cfg-name input:hover { border-color: var(--border); }
+.cfg-name input:focus { border-color: var(--ring); background: var(--surface); outline: none; }
+.dirty { width: 8px; height: 8px; border-radius: 50%; background: var(--accent-3); display: none; }
+.dirty.on { display: inline-block; }
+.spacer { flex: 1; }
+.tb-group { display: flex; align-items: center; gap: 6px; }
+
+.btn {
+  display: inline-flex; align-items: center; gap: 6px; height: 34px; padding: 0 12px;
+  border-radius: 10px; border: 1px solid var(--border-strong); background: var(--surface);
+  color: var(--text-1); font-weight: 500; white-space: nowrap; transition: background .15s, border-color .15s, transform .05s;
+}
+.btn:hover { background: var(--surface-2); }
+.btn:active { transform: translateY(1px); }
+.btn.primary { border-color: transparent; background: var(--accent-grad); color: #fff; box-shadow: 0 6px 18px -8px var(--accent-1); }
+.btn.primary:hover { filter: brightness(1.06); }
+.btn.ghost { background: transparent; border-color: transparent; }
+.btn.ghost:hover { background: var(--surface-3); }
+.btn.icon { width: 34px; padding: 0; justify-content: center; }
+.btn.sm { height: 28px; padding: 0 9px; font-size: 13px; border-radius: 8px; }
+.btn.sm.icon { width: 28px; padding: 0; }
+.btn.danger { color: var(--bad-text); }
+.btn[disabled] { opacity: .5; cursor: not-allowed; }
+select.sel, input.inp, textarea.inp {
+  height: 34px; border-radius: 10px; border: 1px solid var(--border-strong); background: var(--surface);
+  padding: 0 10px;
+}
+textarea.inp { height: auto; padding: 8px 10px; resize: vertical; }
+select.sel:focus, input.inp:focus, textarea.inp:focus { outline: none; border-color: var(--ring); box-shadow: 0 0 0 3px color-mix(in srgb, var(--ring) 35%, transparent); }
+
+.pill { display: inline-flex; align-items: center; gap: 7px; height: 30px; padding: 0 12px; border-radius: 999px; border: 1px solid var(--border-strong); background: var(--surface); font-size: 13px; font-weight: 600; }
+.pill .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
+.pill.live .dot { background: var(--good); box-shadow: 0 0 0 0 rgba(12, 163, 12, .6); animation: pulse 2s infinite; }
+.pill.demo .dot { background: var(--warning); }
+.pill.off .dot { background: var(--critical); }
+@keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(12,163,12,.55); } 70% { box-shadow: 0 0 0 7px rgba(12,163,12,0); } 100% { box-shadow: 0 0 0 0 rgba(12,163,12,0); } }
+@media (prefers-reduced-motion: reduce) { .pill.live .dot { animation: none; } }
+
+/* ------------------------------------------------------------------ sidebar */
+.sidebar { border-right: 1px solid var(--border); background: color-mix(in srgb, var(--surface) 55%, transparent); display: flex; flex-direction: column; min-height: 0; position: sticky; top: 55px; height: calc(100vh - 55px); overflow: auto; }
+.side-sec { padding: 14px 14px 6px; }
+.side-title { display: flex; align-items: center; justify-content: space-between; font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin: 0 4px 8px; }
+.nav-item {
+  display: flex; align-items: center; gap: 10px; width: 100%; padding: 8px 10px; border-radius: 12px;
+  border: 1px solid transparent; background: transparent; text-align: left; color: var(--text-1);
+}
+.nav-item:hover { background: var(--surface-3); }
+.nav-item.active { background: var(--surface); border-color: var(--border-strong); box-shadow: var(--shadow); }
+.nav-item .nm { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nav-item .sub { font-size: 12px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nav-item .txt { min-width: 0; flex: 1; display: flex; flex-direction: column; }
+.nav-item .spark { width: 64px; height: 24px; flex: none; }
+.mchip { width: 10px; height: 10px; border-radius: 3px; flex: none; }
+.sdot { width: 8px; height: 8px; border-radius: 50%; flex: none; background: var(--muted); }
+.sdot.ok { background: var(--good); } .sdot.partial { background: var(--warning); } .sdot.error { background: var(--critical); } .sdot.loading { background: var(--accent-2); }
+
+.picker-search { position: relative; margin: 0 2px 8px; }
+.picker-search input { width: 100%; padding-left: 32px; }
+.picker-search svg { position: absolute; left: 10px; top: 9px; color: var(--muted); }
+.presets { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 2px 10px; }
+.cat { margin-bottom: 4px; border-radius: 12px; }
+.cat > summary { list-style: none; display: flex; align-items: center; gap: 8px; padding: 7px 8px; border-radius: 10px; cursor: pointer; font-weight: 600; font-size: 13px; }
+.cat > summary::-webkit-details-marker { display: none; }
+.cat > summary:hover { background: var(--surface-3); }
+.cat > summary .chev { transition: transform .15s; color: var(--muted); }
+.cat[open] > summary .chev { transform: rotate(90deg); }
+.cat > summary .cnt { margin-left: auto; font-size: 11px; font-weight: 700; color: var(--muted); background: var(--surface-3); border-radius: 999px; padding: 1px 8px; }
+.cat > summary .cnt.on { color: #fff; background: var(--accent-1); }
+.metric-opt { display: flex; align-items: flex-start; gap: 9px; padding: 6px 8px 6px 12px; border-radius: 9px; cursor: pointer; font-size: 13px; }
+.metric-opt:hover { background: var(--surface-3); }
+.metric-opt input { margin-top: 3px; accent-color: var(--accent-1); }
+.metric-opt .d { font-size: 11.5px; color: var(--muted); line-height: 1.3; }
+.metric-opt .del { margin-left: auto; }
+.side-foot { margin-top: auto; padding: 12px 16px; font-size: 12px; color: var(--muted); border-top: 1px solid var(--border); }
+
+/* ------------------------------------------------------------------ main */
+main { padding: 22px clamp(16px, 2.4vw, 32px) 48px; min-width: 0; }
+.banner { display: flex; gap: 12px; align-items: center; padding: 12px 16px; border-radius: 14px; margin-bottom: 18px; border: 1px solid color-mix(in srgb, var(--warning) 45%, transparent); background: linear-gradient(90deg, color-mix(in srgb, var(--warning) 16%, var(--surface)), var(--surface)); }
+.banner svg { color: var(--warning); }
+.banner .t { flex: 1; }
+.page-head { display: flex; align-items: flex-end; gap: 16px; flex-wrap: wrap; margin-bottom: 18px; }
+.page-head h1 { margin: 0; font-size: 26px; letter-spacing: -.02em; line-height: 1.15; }
+.page-head .sub { color: var(--text-2); margin-top: 4px; display: flex; gap: 14px; flex-wrap: wrap; align-items: center; }
+.page-head .acts { margin-left: auto; display: flex; gap: 8px; flex-wrap: wrap; }
+.sec-title { font-size: 12px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin: 26px 2px 12px; display: flex; align-items: center; gap: 10px; }
+.sec-title::after { content: ""; flex: 1; height: 1px; background: linear-gradient(90deg, var(--border-strong), transparent); }
+
+.card {
+  position: relative; border-radius: var(--radius); padding: 16px;
+  background:
+    linear-gradient(var(--surface), var(--surface)) padding-box,
+    linear-gradient(140deg, color-mix(in srgb, var(--accent-1) 45%, var(--border-strong)), var(--border) 38%, var(--border) 62%, color-mix(in srgb, var(--accent-2) 40%, var(--border-strong))) border-box;
+  border: 1px solid transparent; box-shadow: var(--shadow); min-width: 0;
+}
+.card::before { content: ""; position: absolute; inset: 0 0 auto 0; height: 70px; border-radius: var(--radius) var(--radius) 0 0; background: linear-gradient(180deg, color-mix(in srgb, var(--accent-1) 6%, transparent), transparent); pointer-events: none; }
+
+/* sysinfo strip */
+.sysgrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; }
+.sysitem { padding: 12px 14px; border-radius: 12px; background: var(--surface-2); border: 1px solid var(--border); min-width: 0; }
+.sysitem .k { font-size: 12px; color: var(--muted); }
+.sysitem .v { font-weight: 600; margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.meter { height: 8px; border-radius: 999px; background: color-mix(in srgb, var(--s1) 18%, var(--surface-3)); overflow: hidden; margin-top: 8px; }
+.meter > i { display: block; height: 100%; border-radius: 999px; background: var(--s1); }
+.meter.warning > i { background: var(--warning); } .meter.critical > i { background: var(--critical); }
+
+/* KPI tiles */
+.tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 14px; }
+.tile { padding: 14px 16px 12px; overflow: hidden; }
+.tile .bar { position: absolute; left: 0; right: 0; top: 0; height: 3px; background: var(--accent-grad); opacity: .85; border-radius: var(--radius) var(--radius) 0 0; }
+.tile.warning .bar { background: var(--warning); } .tile.critical .bar { background: var(--critical); } .tile.good .bar { background: var(--good); }
+.tile .lbl { font-size: 13px; color: var(--text-2); display: flex; align-items: center; gap: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tile .val { font-size: 28px; font-weight: 650; letter-spacing: -.02em; margin-top: 4px; line-height: 1.1; white-space: nowrap; }
+.tile .row { display: flex; align-items: flex-end; justify-content: space-between; gap: 8px; margin-top: 6px; }
+.tile .delta { font-size: 12px; color: var(--muted); white-space: nowrap; }
+.tile .delta.good { color: var(--ok-text); } .tile .delta.bad { color: var(--bad-text); }
+.tile .spark { width: 96px; height: 30px; flex: none; }
+.tile.na .val { font-size: 15px; color: var(--muted); font-weight: 500; }
+
+.status { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 600; color: var(--text-2); }
+.status svg { width: 14px; height: 14px; }
+.status.good svg { color: var(--good); } .status.warning svg { color: var(--warning); } .status.critical svg { color: var(--critical); }
+
+/* chart cards */
+.cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 420px), 1fr)); gap: 16px; }
+.card.wide { grid-column: 1 / -1; }
+.card-head { display: flex; align-items: flex-start; gap: 10px; position: relative; }
+.card-head h3 { margin: 0; font-size: 15px; font-weight: 650; }
+.card-head .meta { font-size: 12px; color: var(--muted); margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.card-head .ttl { min-width: 0; flex: 1; }
+.card-head .acts { display: flex; gap: 2px; opacity: .75; }
+.card:hover .card-head .acts, .card:focus-within .card-head .acts { opacity: 1; }
+.drag { cursor: grab; color: var(--muted); padding: 4px 0; }
+.card.dragging { opacity: .45; }
+.card.drop-before { box-shadow: -4px 0 0 0 var(--accent-1), var(--shadow); }
+.chip { display: inline-block; font-size: 11px; font-weight: 600; padding: 1px 8px; border-radius: 999px; background: var(--surface-3); color: var(--text-2); vertical-align: 2px; margin-left: 6px; }
+.chip.cim { background: color-mix(in srgb, var(--accent-2) 22%, var(--surface-3)); }
+.card-kpi { display: flex; align-items: center; gap: 14px; margin: 12px 0 6px; position: relative; }
+.card-kpi .big { font-size: 30px; font-weight: 650; letter-spacing: -.02em; line-height: 1; }
+.card-kpi .gauge { width: 118px; height: 70px; flex: none; }
+.card-kpi .kv { display: flex; flex-direction: column; gap: 6px; }
+.chart { position: relative; height: 190px; outline: none; border-radius: 10px; touch-action: pan-y; }
+.card.wide .chart { height: 240px; }
+.chart svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+.chart:focus-visible { box-shadow: 0 0 0 2px var(--ring); }
+.chart .empty { position: absolute; inset: 0; display: grid; place-items: center; color: var(--muted); font-size: 13px; text-align: center; padding: 0 20px; }
+.legend { display: flex; flex-wrap: wrap; gap: 4px 14px; margin-top: 10px; font-size: 12px; color: var(--text-2); }
+.legend .k { display: inline-flex; align-items: center; gap: 6px; max-width: 220px; }
+.legend .k span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.legend .ln { width: 14px; height: 3px; border-radius: 2px; flex: none; }
+.legend .more { color: var(--muted); font-style: italic; }
+.card-error { margin-top: 12px; padding: 14px; border-radius: 12px; background: var(--surface-2); color: var(--text-2); font-size: 13px; display: flex; gap: 10px; align-items: flex-start; }
+.card-error svg { color: var(--muted); margin-top: 2px; }
+table.data { width: 100%; border-collapse: collapse; font-size: 12.5px; font-variant-numeric: tabular-nums; }
+table.data th, table.data td { padding: 5px 8px; text-align: right; border-bottom: 1px solid var(--grid); white-space: nowrap; }
+table.data th:first-child, table.data td:first-child { text-align: left; }
+table.data th { color: var(--muted); font-weight: 600; position: sticky; top: 0; background: var(--surface); }
+.table-wrap { max-height: 240px; overflow: auto; margin-top: 8px; border-radius: 8px; }
+
+/* overview */
+.fleet { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 330px), 1fr)); gap: 16px; }
+.mcard { cursor: pointer; transition: transform .15s, box-shadow .15s; }
+.mcard:hover { transform: translateY(-2px); }
+.mcard .mh { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.mcard .mh .nm { font-weight: 650; font-size: 15px; }
+.mcard .mh .host { font-size: 12px; color: var(--muted); }
+.mcard .mh .st { margin-left: auto; }
+.mrow { display: grid; grid-template-columns: minmax(0, 1fr) auto 76px 18px; align-items: center; gap: 10px; padding: 6px 0; border-top: 1px solid var(--grid); font-size: 13px; }
+.mrow .l { color: var(--text-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mrow .v { font-weight: 600; white-space: nowrap; }
+.mrow .spark { width: 76px; height: 22px; }
+.mrow .status svg { width: 16px; height: 16px; }
+.mcard .err { color: var(--text-2); font-size: 13px; padding: 8px 0; }
+.stat-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 14px; margin-bottom: 4px; }
+.stat .lbl { font-size: 13px; color: var(--text-2); }
+.stat .val { font-size: 34px; font-weight: 650; letter-spacing: -.02em; line-height: 1.15; }
+.stat .val small { font-size: 14px; color: var(--muted); font-weight: 500; }
+
+.empty-state { text-align: center; padding: 60px 20px; }
+.empty-state .ic { width: 64px; height: 64px; border-radius: 18px; background: var(--accent-grad); display: grid; place-items: center; margin: 0 auto 16px; box-shadow: 0 12px 30px -10px var(--accent-1); }
+.empty-state .ic svg { width: 32px; height: 32px; color: #fff; }
+.empty-state h2 { margin: 0 0 6px; }
+.empty-state p { color: var(--text-2); max-width: 460px; margin: 0 auto 18px; }
+
+/* tooltip / menus / dialogs / toasts */
+#tooltip { position: fixed; z-index: 100; pointer-events: none; min-width: 150px; max-width: 320px; padding: 9px 11px; border-radius: 12px; background: var(--surface); border: 1px solid var(--border-strong); box-shadow: 0 12px 32px -8px rgba(0,0,0,.35); font-size: 12.5px; display: none; }
+#tooltip .tt { color: var(--muted); font-size: 11.5px; margin-bottom: 5px; }
+#tooltip .r { display: grid; grid-template-columns: 14px auto minmax(0, 1fr); align-items: center; gap: 7px; padding: 1px 0; }
+#tooltip .r b { font-weight: 650; font-variant-numeric: tabular-nums; }
+#tooltip .r span { color: var(--text-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#tooltip .ln { width: 14px; height: 3px; border-radius: 2px; }
+.menu { position: fixed; z-index: 90; min-width: 200px; padding: 6px; border-radius: 12px; background: var(--surface); border: 1px solid var(--border-strong); box-shadow: 0 16px 40px -12px rgba(0,0,0,.4); }
+.menu button { display: flex; align-items: center; gap: 10px; width: 100%; padding: 8px 10px; border: 0; border-radius: 8px; background: transparent; text-align: left; }
+.menu button:hover, .menu button:focus-visible { background: var(--surface-3); outline: none; }
+.menu hr { border: 0; border-top: 1px solid var(--border); margin: 5px 4px; }
+.menu .danger { color: var(--bad-text); }
+dialog { border: 0; padding: 0; border-radius: 18px; background: var(--surface); color: var(--text-1); box-shadow: 0 30px 80px -20px rgba(0,0,0,.55); width: min(560px, calc(100vw - 32px)); max-height: calc(100vh - 48px); }
+dialog.wide { width: min(900px, calc(100vw - 32px)); }
+dialog::backdrop { background: rgba(6, 9, 20, .55); backdrop-filter: blur(3px); }
+.dlg { display: flex; flex-direction: column; max-height: calc(100vh - 48px); }
+.dlg-head { padding: 18px 20px 0; display: flex; align-items: center; gap: 10px; }
+.dlg-head h2 { margin: 0; font-size: 18px; flex: 1; }
+.dlg-body { padding: 16px 20px; overflow: auto; }
+.dlg-foot { padding: 14px 20px; display: flex; gap: 8px; justify-content: flex-end; border-top: 1px solid var(--border); flex-wrap: wrap; }
+.dlg-foot .left { margin-right: auto; display: flex; align-items: center; gap: 8px; }
+.field { display: flex; flex-direction: column; gap: 5px; margin-bottom: 14px; }
+.field label { font-size: 13px; font-weight: 600; }
+.field .hint { font-size: 12px; color: var(--muted); }
+.field .inp, .field .sel { width: 100%; }
+.frow { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.seg { display: inline-flex; border: 1px solid var(--border-strong); border-radius: 10px; padding: 2px; background: var(--surface-2); }
+.seg button { border: 0; background: transparent; padding: 5px 12px; border-radius: 8px; font-weight: 500; }
+.seg button.on { background: var(--surface); box-shadow: var(--shadow); font-weight: 650; }
+details.adv > summary { cursor: pointer; color: var(--text-2); font-weight: 600; margin-bottom: 12px; }
+.test-result { font-size: 13px; }
+.test-result.ok { color: var(--ok-text); } .test-result.bad { color: var(--bad-text); }
+.set-list { border: 1px solid var(--border); border-radius: 12px; max-height: 52vh; overflow: auto; }
+.set-list details { border-bottom: 1px solid var(--border); }
+.set-list summary { padding: 8px 12px; cursor: pointer; font-weight: 600; font-size: 13px; }
+.set-list summary .d { display: block; font-weight: 400; color: var(--muted); font-size: 12px; }
+.set-list .p { display: flex; align-items: center; gap: 8px; padding: 5px 12px 5px 22px; font-size: 12.5px; }
+.set-list .p:hover { background: var(--surface-3); }
+.set-list .p .mono { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cfg-list button { display: flex; width: 100%; justify-content: space-between; gap: 12px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-2); margin-bottom: 8px; text-align: left; }
+.cfg-list button:hover { border-color: var(--ring); }
+#toasts { position: fixed; right: 18px; bottom: 18px; z-index: 110; display: flex; flex-direction: column; gap: 8px; }
+.toast { padding: 10px 14px; border-radius: 12px; background: var(--surface); border: 1px solid var(--border-strong); box-shadow: 0 12px 30px -10px rgba(0,0,0,.4); display: flex; align-items: center; gap: 10px; max-width: 380px; animation: tin .2s ease-out; }
+.toast.ok svg { color: var(--good); } .toast.err svg { color: var(--critical); } .toast.info svg { color: var(--accent-1); }
+@keyframes tin { from { transform: translateY(8px); opacity: 0; } }
+.drop-overlay { position: fixed; inset: 0; z-index: 120; display: none; place-items: center; background: color-mix(in srgb, var(--accent-1) 18%, rgba(0,0,0,.4)); backdrop-filter: blur(2px); color: #fff; font-size: 22px; font-weight: 700; }
+.drop-overlay.on { display: grid; }
+.drop-overlay div { padding: 30px 40px; border: 2px dashed #fff; border-radius: 20px; }
+.refetch .chart svg.base { transition: opacity .2s; }
+
+.menu-toggle { display: none; }
+@media (max-width: 900px) {
+  .app { grid-template-columns: 1fr; }
+  .sidebar { position: fixed; top: 0; left: 0; bottom: 0; z-index: 60; width: min(320px, 88vw); height: 100vh; transform: translateX(-100%); transition: transform .2s; background: var(--surface); box-shadow: var(--shadow); }
+  .sidebar.open { transform: none; }
+  .menu-toggle { display: inline-flex; }
+  .cfg-name input { width: 150px; }
+  .tb-hide-sm { display: none !important; }
+  .frow { grid-template-columns: 1fr; }
+}
+@media (forced-colors: active) {
+  .card { border: 1px solid CanvasText; }
+  .legend .ln, #tooltip .ln { forced-color-adjust: none; }
+}
+@media print {
+  .topbar, .sidebar, .card-head .acts, .banner { display: none !important; }
+  .app { display: block; }
+  body { background: #fff; }
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="topbar">
+    <button class="btn ghost icon menu-toggle" id="btnSide" title="Show sidebar" aria-label="Show sidebar"></button>
+    <div class="brand">
+      <div class="brand-logo"><svg viewBox="0 0 24 24"><path d="M2 13h4l3-8 5 14 3-6h5"/></svg></div>
+      <span class="brand-name">MultiMonitor</span>
+    </div>
+    <div class="cfg-name">
+      <input id="cfgName" aria-label="Configuration name" spellcheck="false">
+      <span class="dirty" id="dirtyDot" title="Unsaved changes"></span>
+    </div>
+    <div class="tb-group">
+      <button class="btn sm" id="btnOpen" title="Open a config file (Ctrl+O)"></button>
+      <button class="btn sm" id="btnSave" title="Save config (Ctrl+S)"></button>
+      <button class="btn sm icon" id="btnFileMenu" title="More file options" aria-label="More file options"></button>
+    </div>
+    <div class="spacer"></div>
+    <span class="pill" id="modePill" role="status"><span class="dot"></span><span id="modeText">Connecting…</span></span>
+    <div class="tb-group tb-hide-sm">
+      <select class="sel" id="selWindow" aria-label="Time window" title="Time window"></select>
+      <select class="sel" id="selRefresh" aria-label="Refresh interval" title="Refresh interval"></select>
+    </div>
+    <div class="tb-group">
+      <button class="btn icon" id="btnPause" title="Pause updates" aria-label="Pause updates"></button>
+      <button class="btn icon" id="btnTheme" title="Theme" aria-label="Toggle theme"></button>
+      <button class="btn icon" id="btnSettings" title="Settings" aria-label="Settings"></button>
+    </div>
+  </header>
+  <aside class="sidebar" id="sidebar" aria-label="Machines and metrics"></aside>
+  <main id="main" tabindex="-1"></main>
+</div>
+<div id="tooltip" role="tooltip"></div>
+<div id="toasts" aria-live="polite"></div>
+<div class="drop-overlay" id="dropOverlay"><div>Drop a MultiMonitor config (.json) to open it</div></div>
+<dialog id="dlg"></dialog>
+<input type="file" id="fileInput" accept=".json,application/json" hidden>
+
+<script>
+'use strict';
+/* =====================================================================
+   MultiMonitor dashboard - single file, no dependencies.
+   Talks to MultiMonitor.ps1 (the agent) over HTTP; falls back to
+   simulated data when no agent is reachable so the page always works.
+   ===================================================================== */
+
+const APP_VERSION = '1.0.0';
+const SCHEMA = 'multimonitor-config';
+const LS_KEY = 'multimonitor.autosave.v1';
+const SERIES_SLOTS = 8;
+const WINDOWS = [1, 5, 15, 30, 60];
+const REFRESHES = [2, 5, 10, 30, 60];
+const MAX_KEEP_MIN = 60;
+
+/* ------------------------------------------------------------------ icons */
+const ICONS = {
+  menu: '<path d="M4 6h16M4 12h16M4 18h16"/>',
+  server: '<rect x="3" y="4" width="18" height="7" rx="2"/><rect x="3" y="13" width="18" height="7" rx="2"/><path d="M7 7.5h.01M7 16.5h.01"/>',
+  grid: '<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>',
+  plus: '<path d="M12 5v14M5 12h14"/>',
+  open: '<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v1"/><path d="M3 7v11a2 2 0 0 0 2 2h13l3-9H7l-3 9"/>',
+  save: '<path d="M5 3h11l5 5v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z"/><path d="M7 3v5h8M7 21v-7h10v7"/>',
+  down: '<path d="m6 9 6 6 6-6"/>',
+  chevron: '<path d="m9 6 6 6-6 6"/>',
+  pause: '<rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/>',
+  play: '<path d="M7 5v14l12-7z"/>',
+  sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>',
+  moon: '<path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/>',
+  auto: '<circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 0 0 18z" fill="currentColor"/>',
+  settings: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/>',
+  more: '<circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/>',
+  table: '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18M3 15h18M9 4v16"/>',
+  chart: '<path d="M3 3v18h18"/><path d="m7 15 4-5 3 3 5-7"/>',
+  x: '<path d="M18 6 6 18M6 6l12 12"/>',
+  check: '<circle cx="12" cy="12" r="9"/><path d="m8 12 3 3 5-6"/>',
+  warn: '<path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4M12 17h.01"/>',
+  crit: '<path d="M7.9 2h8.2L22 7.9v8.2L16.1 22H7.9L2 16.1V7.9z"/><path d="M15 9l-6 6M9 9l6 6"/>',
+  info: '<circle cx="12" cy="12" r="9"/><path d="M12 16v-4M12 8h.01"/>',
+  search: '<circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/>',
+  trash: '<path d="M3 6h18M8 6V4h8v2M6 6l1 14a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-14"/>',
+  edit: '<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 1 1 3 3L7 19l-4 1 1-4z"/>',
+  wide: '<path d="M3 12h18M7 8l-4 4 4 4M17 8l4 4-4 4"/>',
+  drag: '<circle cx="9" cy="6" r="1"/><circle cx="15" cy="6" r="1"/><circle cx="9" cy="12" r="1"/><circle cx="15" cy="12" r="1"/><circle cx="9" cy="18" r="1"/><circle cx="15" cy="18" r="1"/>',
+  file: '<path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6"/>',
+  cloud: '<path d="M17.5 19a4.5 4.5 0 1 0-1.4-8.8A6 6 0 1 0 6 16.9"/><path d="M12 12v9M9 15l3-3 3 3"/>',
+  cloudDown: '<path d="M17.5 19a4.5 4.5 0 1 0-1.4-8.8A6 6 0 1 0 6 16.9"/><path d="M12 12v9M9 18l3 3 3-3"/>',
+  newfile: '<path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6M12 12v6M9 15h6"/>',
+  list: '<path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/>',
+  pulse: '<path d="M2 13h4l3-8 5 14 3-6h5"/>',
+  refresh: '<path d="M21 12a9 9 0 1 1-2.6-6.4L21 8"/><path d="M21 3v5h-5"/>',
+};
+const icon = (name, cls = 'i') => `<svg class="${cls}" viewBox="0 0 24 24" aria-hidden="true">${ICONS[name] || ''}</svg>`;
+
+/* ------------------------------------------------------------------ utils */
+const $ = (sel, root = document) => root.querySelector(sel);
+function esc(s) {
+  return String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+/** Tiny DOM builder. `html` is only used with trusted, static markup (icons). */
+function el(tag, props = {}, ...kids) {
+  const n = document.createElement(tag);
+  for (const [k, v] of Object.entries(props || {})) {
+    if (v == null || v === false) continue;
+    if (k === 'class') n.className = v;
+    else if (k === 'html') n.innerHTML = v;
+    else if (k === 'text') n.textContent = v;
+    else if (k === 'style' && typeof v === 'object') Object.assign(n.style, v);
+    else if (k.startsWith('on') && typeof v === 'function') n.addEventListener(k.slice(2), v);
+    else if (k === 'dataset') Object.assign(n.dataset, v);
+    else if (v === true) n.setAttribute(k, '');
+    else n.setAttribute(k, v);
+  }
+  for (const kid of kids.flat()) {
+    if (kid == null || kid === false) continue;
+    n.append(kid instanceof Node ? kid : document.createTextNode(String(kid)));
+  }
+  return n;
+}
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+const uid = p => p + Math.random().toString(36).slice(2, 8) + Date.now().toString(36).slice(-4);
+const isNum = v => typeof v === 'number' && Number.isFinite(v);
+function hashStr(s) { let h = 2166136261; for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); } return h >>> 0; }
+function rng(seed) { let a = seed >>> 0; return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+function debounce(fn, ms) { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; }
+function slug(s) { return String(s || 'dashboard').trim().replace(/[^A-Za-z0-9 _.-]+/g, '').replace(/\s+/g, '-').replace(/^[^A-Za-z0-9]+/, '').slice(0, 60) || 'dashboard'; }
+
+/* ------------------------------------------------------------------ number formatting */
+const nf0 = new Intl.NumberFormat(undefined, { maximumFractionDigits: 0 });
+const nf1 = new Intl.NumberFormat(undefined, { maximumFractionDigits: 1 });
+const nf2 = new Intl.NumberFormat(undefined, { maximumFractionDigits: 2 });
+function compact(v) {
+  const a = Math.abs(v);
+  if (a >= 1e12) return nf1.format(v / 1e12) + 'T';
+  if (a >= 1e9) return nf1.format(v / 1e9) + 'B';
+  if (a >= 1e6) return nf1.format(v / 1e6) + 'M';
+  if (a >= 1e4) return nf1.format(v / 1e3) + 'K';
+  if (a >= 100 || Number.isInteger(v)) return nf0.format(v);
+  if (a >= 10) return nf1.format(v);
+  return nf2.format(v);
+}
+const BYTE_UNITS = ['B', 'KB', 'MB', 'GB', 'TB', 'PB'];
+function bytes(v) {
+  let a = Math.abs(v), i = 0;
+  while (a >= 1024 && i < BYTE_UNITS.length - 1) { a /= 1024; i++; }
+  const s = a >= 100 || i === 0 ? nf0.format(a) : a >= 10 ? nf1.format(a) : nf2.format(a);
+  return (v < 0 ? '-' : '') + s + ' ' + BYTE_UNITS[i];
+}
+function duration(sec) {
+  sec = Math.max(0, Math.round(sec));
+  const d = Math.floor(sec / 86400), h = Math.floor(sec % 86400 / 3600), m = Math.floor(sec % 3600 / 60), s = sec % 60;
+  if (d) return `${d}d ${h}h`;
+  if (h) return `${h}h ${m}m`;
+  if (m) return `${m}m ${s}s`;
+  return `${s}s`;
+}
+const UNITS = {
+  pct:      { name: 'Percent',        fmt: v => (Math.abs(v) < 10 ? nf1 : nf0).format(v) + '%' },
+  count:    { name: 'Count',          fmt: v => compact(v) },
+  persec:   { name: 'Per second',     fmt: v => compact(v) + '/s' },
+  bytes:    { name: 'Bytes',          fmt: v => bytes(v), bin: true },
+  bps:      { name: 'Bytes / second', fmt: v => bytes(v) + '/s', bin: true },
+  mb:       { name: 'Megabytes',      fmt: v => bytes(v * 1048576) },
+  ms:       { name: 'Milliseconds',   fmt: v => (Math.abs(v) < 10 ? nf1 : nf0).format(v) + ' ms' },
+  sec:      { name: 'Seconds',        fmt: v => compact(v) + ' s' },
+  duration: { name: 'Duration',       fmt: v => duration(v) },
+};
+const fmtVal = (unit, v) => isNum(v) ? (UNITS[unit] || UNITS.count).fmt(v) : '—';
+
+/* ------------------------------------------------------------------ metric catalog
+   path   : Windows counter path (English counter names).
+   multi  : path uses a (*) wildcard -> one series per instance.
+   agg    : how instances roll up into one KPI value (sum | avg | max | min).
+   dir    : 'above' = high values are bad, 'below' = low values are bad.
+   xf     : transform(value, sysinfo) applied to each raw value.
+   gauge  : show a radial gauge in the card.
+*/
+const CATEGORIES = [
+  ['cpu', 'Processor'], ['mem', 'Memory'], ['disk', 'Disk'], ['net', 'Network'],
+  ['web', 'Web Services (IIS)'], ['asp', 'ASP.NET'], ['clr', '.NET CLR'], ['sql', 'SQL Server'],
+  ['sys', 'System'], ['proc', 'Processes'], ['custom', 'Custom counters'],
+];
+const XF = {
+  idleToBusy: v => clamp(100 - v, 0, 100),
+  memUsed: (v, sys) => sys && sys.totalMemoryKB > 0 ? clamp(100 - v * 1024 * 100 / sys.totalMemoryKB, 0, 100) : null,
+  perCpu: (v, sys) => v / Math.max(1, (sys && sys.logicalCpus) || 1),
+  secToMs: v => v * 1000,
+};
+const CATALOG = [
+  { id: 'cpu.total', cat: 'cpu', label: 'CPU usage', path: '\\Processor(_Total)\\% Processor Time', unit: 'pct', max: 100, warn: 75, crit: 90, gauge: true, desc: 'Total processor utilisation across all cores.', demo: [38, 30] },
+  { id: 'cpu.cores', cat: 'cpu', label: 'CPU per core', path: '\\Processor(*)\\% Processor Time', unit: 'pct', max: 100, multi: true, exclude: ['_total'], agg: 'avg', desc: 'Utilisation of every logical processor.', demoInst: ['0', '1', '2', '3', '4', '5', '6', '7'], demo: [35, 35] },
+  { id: 'cpu.user', cat: 'cpu', label: 'User time', path: '\\Processor(_Total)\\% User Time', unit: 'pct', max: 100, desc: 'Time spent running application code.', demo: [26, 20] },
+  { id: 'cpu.priv', cat: 'cpu', label: 'Privileged time', path: '\\Processor(_Total)\\% Privileged Time', unit: 'pct', max: 100, warn: 30, crit: 50, desc: 'Time spent in kernel mode.', demo: [9, 6] },
+  { id: 'cpu.int', cat: 'cpu', label: 'Interrupt time', path: '\\Processor(_Total)\\% Interrupt Time', unit: 'pct', max: 100, warn: 10, crit: 20, desc: 'Time servicing hardware interrupts.', demo: [1.2, 1] },
+  { id: 'cpu.queue', cat: 'cpu', label: 'Processor queue length', path: '\\System\\Processor Queue Length', unit: 'count', warn: 5, crit: 10, desc: 'Threads waiting for a CPU. Sustained values above 2 per core indicate a bottleneck.', demo: [1, 3] },
+
+  { id: 'mem.used', cat: 'mem', label: 'Physical memory used', path: '\\Memory\\Available MBytes', xf: 'memUsed', unit: 'pct', max: 100, warn: 80, crit: 92, gauge: true, desc: 'Share of installed RAM in use (needs system info).', demo: [62, 8] },
+  { id: 'mem.avail', cat: 'mem', label: 'Available memory', path: '\\Memory\\Available MBytes', unit: 'mb', dir: 'below', warn: 1024, crit: 512, desc: 'RAM immediately available to processes.', demo: [6200, 900] },
+  { id: 'mem.commit', cat: 'mem', label: 'Committed bytes in use', path: '\\Memory\\% Committed Bytes In Use', unit: 'pct', max: 100, warn: 80, crit: 90, gauge: true, desc: 'Commit charge as a share of the commit limit.', demo: [55, 10] },
+  { id: 'mem.pages', cat: 'mem', label: 'Pages / sec', path: '\\Memory\\Pages/sec', unit: 'persec', warn: 500, crit: 1000, desc: 'Hard page faults resolved from disk.', demo: [40, 60] },
+  { id: 'mem.faults', cat: 'mem', label: 'Page faults / sec', path: '\\Memory\\Page Faults/sec', unit: 'persec', desc: 'Soft + hard page faults.', demo: [1800, 900] },
+  { id: 'mem.cache', cat: 'mem', label: 'Cache bytes', path: '\\Memory\\Cache Bytes', unit: 'bytes', desc: 'System file-cache working set.', demo: [9e8, 1e8] },
+  { id: 'mem.nonpaged', cat: 'mem', label: 'Pool non-paged bytes', path: '\\Memory\\Pool Nonpaged Bytes', unit: 'bytes', desc: 'Kernel memory that cannot be paged. Steady growth suggests a driver leak.', demo: [3.2e8, 1e7] },
+
+  { id: 'disk.busy', cat: 'disk', label: 'Disk busy', path: '\\PhysicalDisk(_Total)\\% Idle Time', xf: 'idleToBusy', unit: 'pct', max: 100, warn: 70, crit: 90, gauge: true, desc: '100 − % idle time across all physical disks.', demo: [22, 20] },
+  { id: 'disk.queue', cat: 'disk', label: 'Disk queue length', path: '\\PhysicalDisk(_Total)\\Current Disk Queue Length', unit: 'count', warn: 2, crit: 5, desc: 'Outstanding I/O requests.', demo: [0.6, 1.5] },
+  { id: 'disk.read', cat: 'disk', label: 'Disk read throughput', path: '\\PhysicalDisk(_Total)\\Disk Read Bytes/sec', unit: 'bps', desc: 'Bytes read per second.', demo: [4e6, 4e6] },
+  { id: 'disk.write', cat: 'disk', label: 'Disk write throughput', path: '\\PhysicalDisk(_Total)\\Disk Write Bytes/sec', unit: 'bps', desc: 'Bytes written per second.', demo: [2.5e6, 2.5e6] },
+  { id: 'disk.iops', cat: 'disk', label: 'Disk IOPS', path: '\\PhysicalDisk(_Total)\\Disk Transfers/sec', unit: 'persec', desc: 'Read + write operations per second.', demo: [180, 140] },
+  { id: 'disk.latency', cat: 'disk', label: 'Disk latency', path: '\\PhysicalDisk(_Total)\\Avg. Disk sec/Transfer', xf: 'secToMs', unit: 'ms', warn: 20, crit: 50, desc: 'Average time per disk transfer.', demo: [0.006, 0.006] },
+  { id: 'disk.free', cat: 'disk', label: 'Free space per volume', path: '\\LogicalDisk(*)\\% Free Space', unit: 'pct', max: 100, multi: true, exclude: ['_total'], agg: 'min', dir: 'below', warn: 15, crit: 5, desc: 'Free space on every logical volume.', demoInst: ['C:', 'D:', 'E:'], demo: [40, 1] },
+  { id: 'disk.freeMB', cat: 'disk', label: 'Free megabytes per volume', path: '\\LogicalDisk(*)\\Free Megabytes', unit: 'mb', multi: true, exclude: ['_total'], agg: 'sum', desc: 'Absolute free space on every volume.', demoInst: ['C:', 'D:'], demo: [80000, 50] },
+
+  { id: 'net.total', cat: 'net', label: 'Network throughput', path: '\\Network Interface(*)\\Bytes Total/sec', unit: 'bps', multi: true, agg: 'sum', desc: 'Bytes sent + received on every adapter.', demoInst: ['Ethernet0', 'vEthernet (Default Switch)'], demo: [3e6, 3e6] },
+  { id: 'net.recv', cat: 'net', label: 'Network received', path: '\\Network Interface(*)\\Bytes Received/sec', unit: 'bps', multi: true, agg: 'sum', desc: 'Inbound bytes per adapter.', demoInst: ['Ethernet0'], demo: [2e6, 2e6] },
+  { id: 'net.sent', cat: 'net', label: 'Network sent', path: '\\Network Interface(*)\\Bytes Sent/sec', unit: 'bps', multi: true, agg: 'sum', desc: 'Outbound bytes per adapter.', demoInst: ['Ethernet0'], demo: [1e6, 1e6] },
+  { id: 'net.tcp4', cat: 'net', label: 'TCPv4 connections', path: '\\TCPv4\\Connections Established', unit: 'count', desc: 'Established IPv4 TCP connections.', demo: [240, 80] },
+  { id: 'net.tcp6', cat: 'net', label: 'TCPv6 connections', path: '\\TCPv6\\Connections Established', unit: 'count', desc: 'Established IPv6 TCP connections.', demo: [30, 12] },
+  { id: 'net.retrans', cat: 'net', label: 'TCP retransmits / sec', path: '\\TCPv4\\Segments Retransmitted/sec', unit: 'persec', warn: 10, crit: 50, desc: 'Retransmitted segments - a network-quality signal.', demo: [1, 3] },
+  { id: 'net.resets', cat: 'net', label: 'TCP connections reset', path: '\\TCPv4\\Connections Reset', unit: 'count', desc: 'Cumulative resets since boot.', demo: [1200, 5] },
+
+  { id: 'web.conn', cat: 'web', label: 'Current connections', path: '\\Web Service(_Total)\\Current Connections', unit: 'count', desc: 'Active connections to all IIS sites.', demo: [180, 120], role: 'web' },
+  { id: 'web.connSites', cat: 'web', label: 'Connections per site', path: '\\Web Service(*)\\Current Connections', unit: 'count', multi: true, exclude: ['_total'], agg: 'sum', desc: 'Active connections, one series per IIS site.', demoInst: ['Default Web Site', 'api', 'portal'], demo: [60, 50], role: 'web' },
+  { id: 'web.rps', cat: 'web', label: 'Requests / sec', path: '\\Web Service(_Total)\\Total Method Requests/sec', unit: 'persec', desc: 'All HTTP methods, all sites.', demo: [420, 300], role: 'web' },
+  { id: 'web.get', cat: 'web', label: 'GET requests / sec', path: '\\Web Service(_Total)\\Get Requests/sec', unit: 'persec', desc: 'HTTP GET rate.', demo: [340, 250], role: 'web' },
+  { id: 'web.post', cat: 'web', label: 'POST requests / sec', path: '\\Web Service(_Total)\\Post Requests/sec', unit: 'persec', desc: 'HTTP POST rate.', demo: [70, 60], role: 'web' },
+  { id: 'web.bytes', cat: 'web', label: 'Web bytes / sec', path: '\\Web Service(_Total)\\Bytes Total/sec', unit: 'bps', desc: 'Bytes sent + received by IIS.', demo: [5e6, 4e6], role: 'web' },
+  { id: 'web.anon', cat: 'web', label: 'Anonymous users', path: '\\Web Service(_Total)\\Current Anonymous Users', unit: 'count', desc: 'Current anonymous users.', demo: [90, 60], role: 'web' },
+  { id: 'web.404', cat: 'web', label: 'Not-found errors / sec', path: '\\Web Service(_Total)\\Not Found Errors/sec', unit: 'persec', warn: 5, crit: 20, desc: 'HTTP 404 responses.', demo: [1, 3], role: 'web' },
+  { id: 'web.active', cat: 'web', label: 'Active requests (w3wp)', path: '\\W3SVC_W3WP(_Total)\\Active Requests', unit: 'count', warn: 50, crit: 200, desc: 'Requests executing in worker processes.', demo: [12, 20], role: 'web' },
+  { id: 'web.queue', cat: 'web', label: 'HTTP.sys queue size', path: '\\HTTP Service Request Queues(*)\\CurrentQueueSize', unit: 'count', multi: true, agg: 'sum', warn: 10, crit: 50, desc: 'Requests waiting in each application-pool queue.', demoInst: ['DefaultAppPool', 'ApiPool'], demo: [0.5, 3], role: 'web' },
+
+  { id: 'asp.queued', cat: 'asp', label: 'Requests queued', path: '\\ASP.NET\\Requests Queued', unit: 'count', warn: 10, crit: 50, desc: 'Requests waiting for a thread.', demo: [1, 4], role: 'web' },
+  { id: 'asp.current', cat: 'asp', label: 'Requests current', path: '\\ASP.NET\\Requests Current', unit: 'count', desc: 'Requests executing or queued.', demo: [14, 12], role: 'web' },
+  { id: 'asp.rps', cat: 'asp', label: 'ASP.NET requests / sec', path: '\\ASP.NET Applications(__Total__)\\Requests/Sec', unit: 'persec', desc: 'Throughput of all ASP.NET applications.', demo: [260, 180], role: 'web' },
+  { id: 'asp.errors', cat: 'asp', label: 'ASP.NET errors / sec', path: '\\ASP.NET Applications(__Total__)\\Errors Total/Sec', unit: 'persec', warn: 1, crit: 5, desc: 'Unhandled errors.', demo: [0.2, 0.8], role: 'web' },
+  { id: 'asp.exec', cat: 'asp', label: 'Request execution time', path: '\\ASP.NET\\Request Execution Time', unit: 'ms', warn: 1000, crit: 3000, desc: 'Execution time of the most recent request.', demo: [120, 150], role: 'web' },
+  { id: 'asp.wait', cat: 'asp', label: 'Request wait time', path: '\\ASP.NET\\Request Wait Time', unit: 'ms', warn: 500, crit: 2000, desc: 'Queue time of the most recent request.', demo: [5, 20], role: 'web' },
+
+  { id: 'clr.gc', cat: 'clr', label: '% time in GC', path: '\\.NET CLR Memory(_Global_)\\% Time in GC', unit: 'pct', max: 100, warn: 10, crit: 25, desc: 'Share of time spent in garbage collection.', demo: [3, 5] },
+  { id: 'clr.exc', cat: 'clr', label: 'Exceptions / sec', path: '\\.NET CLR Exceptions(_Global_)\\# of Exceps Thrown / sec', unit: 'persec', warn: 50, crit: 200, desc: 'Managed exceptions thrown.', demo: [4, 8] },
+  { id: 'clr.heap', cat: 'clr', label: 'Managed heap size', path: '\\.NET CLR Memory(_Global_)\\# Bytes in all Heaps', unit: 'bytes', desc: 'Bytes in all managed heaps.', demo: [6e8, 8e7] },
+
+  { id: 'sql.conn', cat: 'sql', label: 'User connections', path: '\\SQLServer:General Statistics\\User Connections', unit: 'count', desc: 'Connected SQL Server users (default instance).', demo: [140, 40], role: 'sql' },
+  { id: 'sql.batch', cat: 'sql', label: 'Batch requests / sec', path: '\\SQLServer:SQL Statistics\\Batch Requests/sec', unit: 'persec', desc: 'T-SQL batches received.', demo: [900, 500], role: 'sql' },
+  { id: 'sql.compiles', cat: 'sql', label: 'SQL compilations / sec', path: '\\SQLServer:SQL Statistics\\SQL Compilations/sec', unit: 'persec', desc: 'Query compilations.', demo: [60, 40], role: 'sql' },
+  { id: 'sql.ple', cat: 'sql', label: 'Page life expectancy', path: '\\SQLServer:Buffer Manager\\Page life expectancy', unit: 'sec', dir: 'below', warn: 600, crit: 300, desc: 'Seconds a page stays in the buffer pool.', demo: [2400, 300], role: 'sql' },
+  { id: 'sql.blocked', cat: 'sql', label: 'Processes blocked', path: '\\SQLServer:General Statistics\\Processes blocked', unit: 'count', warn: 1, crit: 5, desc: 'Sessions currently blocked.', demo: [0.3, 1.2], role: 'sql' },
+  { id: 'sql.deadlocks', cat: 'sql', label: 'Deadlocks / sec', path: '\\SQLServer:Locks(_Total)\\Number of Deadlocks/sec', unit: 'persec', warn: 0.1, crit: 1, desc: 'Deadlocks detected.', demo: [0.02, 0.05], role: 'sql' },
+
+  { id: 'sys.procs', cat: 'sys', label: 'Processes', path: '\\System\\Processes', unit: 'count', desc: 'Running processes.', demo: [180, 10] },
+  { id: 'sys.threads', cat: 'sys', label: 'Threads', path: '\\System\\Threads', unit: 'count', desc: 'Threads across all processes.', demo: [2600, 150] },
+  { id: 'sys.ctx', cat: 'sys', label: 'Context switches / sec', path: '\\System\\Context Switches/sec', unit: 'persec', desc: 'Thread context switches.', demo: [14000, 6000] },
+  { id: 'sys.handles', cat: 'sys', label: 'Handle count', path: '\\Process(_Total)\\Handle Count', unit: 'count', desc: 'Open handles across all processes.', demo: [82000, 2000] },
+  { id: 'sys.uptime', cat: 'sys', label: 'System uptime', path: '\\System\\System Up Time', unit: 'duration', desc: 'Time since last boot.', demo: [864000, 0] },
+
+  { id: 'proc.cpu', cat: 'proc', label: 'Top processes by CPU', path: '\\Process(*)\\% Processor Time', xf: 'perCpu', unit: 'pct', max: 100, multi: true, exclude: ['_total', 'idle'], top: 5, agg: 'max', desc: 'Five busiest processes (share of total CPU).', demoInst: ['w3wp', 'sqlservr', 'MsMpEng', 'svchost', 'System', 'explorer'], demo: [6, 8] },
+  { id: 'proc.ws', cat: 'proc', label: 'Top processes by memory', path: '\\Process(*)\\Working Set - Private', unit: 'bytes', multi: true, exclude: ['_total'], top: 5, agg: 'max', desc: 'Five largest private working sets.', demoInst: ['sqlservr', 'w3wp', 'MsMpEng', 'explorer', 'svchost', 'chrome'], demo: [4e8, 2e7] },
+];
+const CATALOG_BY_ID = new Map(CATALOG.map(m => [m.id, m]));
+const PRESETS = {
+  Essentials: ['cpu.total', 'mem.used', 'disk.busy', 'net.total', 'disk.free'],
+  'Web server': ['cpu.total', 'mem.used', 'web.conn', 'web.rps', 'web.connSites', 'asp.queued', 'asp.errors', 'net.total'],
+  'SQL server': ['cpu.total', 'mem.avail', 'sql.batch', 'sql.conn', 'sql.ple', 'sql.blocked', 'disk.latency', 'disk.iops'],
+  Deep: ['cpu.total', 'cpu.cores', 'cpu.queue', 'mem.used', 'mem.pages', 'disk.busy', 'disk.latency', 'disk.queue', 'net.total', 'net.tcp4', 'proc.cpu', 'proc.ws'],
+};
+
+/* ------------------------------------------------------------------ config */
+let config = null;
+const state = {
+  view: 'overview',              // 'overview' | machine id
+  hubOk: false, hubInfo: null, hubError: '',
+  paused: false, dirty: false,
+  fileHandle: null, fileName: '',
+  mode: 'demo',                  // effective: 'live' | 'demo'
+  compareMetric: null,
+};
+
+function defaultSettings() {
+  return { mode: 'auto', hubUrl: '', hubKey: '', refreshSec: 5, windowMin: 5, theme: 'auto' };
+}
+function newMachine(p = {}) {
+  return { id: uid('m'), name: p.name || p.host || 'This PC', host: p.host ?? 'localhost', agentUrl: p.agentUrl || '', apiKey: p.apiKey || '',
+           colorSlot: p.colorSlot ?? 0, roles: p.roles || [], metrics: p.metrics ? [...p.metrics] : [...PRESETS.Essentials], thresholds: {}, layout: {} };
+}
+function defaultConfig() {
+  return { schema: SCHEMA, version: 1, name: 'My dashboard', settings: defaultSettings(), customMetrics: [],
+           machines: [newMachine({ name: 'This PC', host: 'localhost' })], view: 'overview' };
+}
+function demoConfig() {
+  const c = defaultConfig();
+  c.name = 'Demo web farm';
+  c.machines = [
+    newMachine({ name: 'WEB01', host: 'WEB01', colorSlot: 0, roles: ['web'], metrics: ['cpu.total', 'mem.used', 'web.conn', 'web.rps', 'web.connSites', 'net.total', 'asp.queued', 'disk.free'] }),
+    newMachine({ name: 'WEB02', host: 'WEB02', colorSlot: 1, roles: ['web'], metrics: ['cpu.total', 'mem.used', 'web.conn', 'web.rps', 'net.total', 'asp.errors'] }),
+    newMachine({ name: 'SQL01', host: 'SQL01', colorSlot: 2, roles: ['sql'], metrics: ['cpu.total', 'mem.avail', 'sql.batch', 'sql.conn', 'sql.ple', 'disk.latency', 'disk.iops', 'web.conn'] }),
+    newMachine({ name: 'APP01', host: 'APP01', colorSlot: 3, roles: [], metrics: ['cpu.total', 'cpu.cores', 'mem.used', 'disk.busy', 'proc.cpu', 'proc.ws'] }),
+  ];
+  c.machines[0].layout['web.connSites'] = { wide: true };
+  c.view = 'overview';
+  return c;
+}
+function freeColorSlot() {
+  const used = new Set(config.machines.map(m => m.colorSlot));
+  for (let i = 0; i < SERIES_SLOTS; i++) if (!used.has(i)) return i;
+  return config.machines.length % SERIES_SLOTS;
+}
+
+/** Validate + normalise anything loaded from disk, the agent or localStorage. */
+function normalizeConfig(raw) {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) throw new Error('Not a JSON object.');
+  if (raw.schema && raw.schema !== SCHEMA) throw new Error(`Unknown schema "${raw.schema}".`);
+  if (!Array.isArray(raw.machines)) throw new Error('Missing "machines" array - is this a MultiMonitor config?');
+  const str = (v, d = '', max = 300) => typeof v === 'string' ? v.slice(0, max) : d;
+  const num = (v, d, lo, hi) => isNum(+v) && v !== '' && v !== null ? clamp(+v, lo, hi) : d;
+  const s = Object.assign(defaultSettings(), raw.settings || {});
+  const settings = {
+    mode: ['auto', 'live', 'demo'].includes(s.mode) ? s.mode : 'auto',
+    hubUrl: str(s.hubUrl).trim(), hubKey: str(s.hubKey),
+    refreshSec: REFRESHES.includes(+s.refreshSec) ? +s.refreshSec : num(s.refreshSec, 5, 1, 3600),
+    windowMin: WINDOWS.includes(+s.windowMin) ? +s.windowMin : 5,
+    theme: ['auto', 'light', 'dark'].includes(s.theme) ? s.theme : 'auto',
+  };
+  const customMetrics = (Array.isArray(raw.customMetrics) ? raw.customMetrics : []).filter(c => c && typeof c.path === 'string' && c.path.startsWith('\\')).map(c => ({
+    id: /^custom\.[A-Za-z0-9_-]{1,40}$/.test(c.id) ? c.id : 'custom.' + hashStr(c.path).toString(36),
+    cat: 'custom', label: str(c.label, c.path, 120) || c.path, path: str(c.path, '', 400),
+    unit: UNITS[c.unit] ? c.unit : 'count', multi: c.path.includes('*'), exclude: c.path.includes('*') ? ['_total', '__total__', '_global_'] : undefined,
+    agg: ['sum', 'avg', 'max', 'min'].includes(c.agg) ? c.agg : 'sum', dir: c.dir === 'below' ? 'below' : 'above',
+    max: isNum(c.max) ? c.max : (c.unit === 'pct' ? 100 : undefined),
+    warn: isNum(c.warn) ? c.warn : undefined, crit: isNum(c.crit) ? c.crit : undefined, desc: str(c.desc, 'Custom counter', 300),
+  }));
+  const known = id => CATALOG_BY_ID.has(id) || customMetrics.some(c => c.id === id);
+  const seenIds = new Set();
+  const machines = raw.machines.filter(m => m && typeof m === 'object').slice(0, 64).map((m, i) => {
+    let id = /^[A-Za-z0-9_-]{1,40}$/.test(m.id) ? m.id : uid('m');
+    if (seenIds.has(id)) id = uid('m');
+    seenIds.add(id);
+    const thresholds = {};
+    for (const [k, t] of Object.entries(m.thresholds || {})) {
+      if (known(k) && t && typeof t === 'object') thresholds[k] = { warn: isNum(t.warn) ? t.warn : null, crit: isNum(t.crit) ? t.crit : null };
+    }
+    const layout = {};
+    for (const [k, l] of Object.entries(m.layout || {})) if (known(k) && l && typeof l === 'object') layout[k] = { wide: !!l.wide, table: !!l.table };
+    const host = str(m.host, 'localhost', 255).trim();
+    return {
+      id, name: str(m.name, host || 'Machine', 80) || host || 'Machine', host,
+      agentUrl: str(m.agentUrl).trim(), apiKey: str(m.apiKey),
+      colorSlot: Number.isInteger(m.colorSlot) ? clamp(m.colorSlot, 0, SERIES_SLOTS - 1) : i % SERIES_SLOTS,
+      roles: Array.isArray(m.roles) ? m.roles.filter(r => typeof r === 'string').slice(0, 8) : [],
+      metrics: [...new Set((Array.isArray(m.metrics) ? m.metrics : []).filter(x => typeof x === 'string' && known(x)))],
+      thresholds, layout,
+    };
+  });
+  const view = typeof raw.view === 'string' && (raw.view === 'overview' || machines.some(m => m.id === raw.view)) ? raw.view : 'overview';
+  return { schema: SCHEMA, version: 1, name: str(raw.name, 'Dashboard', 80) || 'Dashboard', settings, customMetrics, machines, view };
+}
+function serializeConfig() {
+  const out = {
+    schema: SCHEMA, version: 1, app: `MultiMonitor ${APP_VERSION}`, name: config.name, savedAt: new Date().toISOString(),
+    settings: { ...config.settings },
+    customMetrics: config.customMetrics.map(c => {
+      const o = { id: c.id, label: c.label, path: c.path, unit: c.unit, agg: c.agg, dir: c.dir };
+      if (isNum(c.max)) o.max = c.max; if (isNum(c.warn)) o.warn = c.warn; if (isNum(c.crit)) o.crit = c.crit;
+      if (c.desc && c.desc !== 'Custom counter') o.desc = c.desc;
+      return o;
+    }),
+    machines: config.machines.map(m => {
+      const o = { id: m.id, name: m.name, host: m.host, colorSlot: m.colorSlot, metrics: [...m.metrics] };
+      if (m.agentUrl) o.agentUrl = m.agentUrl;
+      if (m.apiKey) o.apiKey = m.apiKey;
+      if (m.roles.length) o.roles = [...m.roles];
+      const th = Object.entries(m.thresholds).filter(([k]) => m.metrics.includes(k));
+      if (th.length) o.thresholds = Object.fromEntries(th);
+      const ly = Object.entries(m.layout).filter(([k, l]) => m.metrics.includes(k) && (l.wide || l.table));
+      if (ly.length) o.layout = Object.fromEntries(ly);
+      return o;
+    }),
+    view: state.view,
+  };
+  return JSON.stringify(out, null, 2);
+}
+
+function markDirty() {
+  state.dirty = true;
+  $('#dirtyDot').classList.add('on');
+  autosave();
+}
+const autosave = debounce(() => {
+  try { localStorage.setItem(LS_KEY, JSON.stringify({ fileName: state.fileName, dirty: state.dirty, config: JSON.parse(serializeConfig()) })); } catch { /* storage unavailable */ }
+}, 400);
+
+/* ------------------------------------------------------------------ metric helpers */
+function metricDef(id) { return CATALOG_BY_ID.get(id) || config.customMetrics.find(c => c.id === id) || null; }
+function catLabel(cat) { return (CATEGORIES.find(c => c[0] === cat) || [cat, cat])[1]; }
+function thresholdsFor(m, def) {
+  const o = m.thresholds[def.id] || {};
+  return { warn: o.warn !== undefined ? o.warn : def.warn ?? null, crit: o.crit !== undefined ? o.crit : def.crit ?? null, dir: def.dir || 'above' };
+}
+function statusOf(v, th) {
+  if (!isNum(v)) return 'none';
+  const above = th.dir !== 'below';
+  const hit = t => isNum(t) && (above ? v >= t : v <= t);
+  if (hit(th.crit)) return 'critical';
+  if (hit(th.warn)) return 'warning';
+  return isNum(th.warn) || isNum(th.crit) ? 'good' : 'none';
+}
+const STATUS_TEXT = { good: 'Healthy', warning: 'Warning', critical: 'Critical', none: '' };
+function statusBadge(st, withText = true) {
+  if (st === 'none') return el('span');
+  const ic = st === 'good' ? 'check' : st === 'warning' ? 'warn' : 'crit';
+  return el('span', { class: 'status ' + st, title: STATUS_TEXT[st], html: icon(ic) + (withText ? `<span>${STATUS_TEXT[st]}</span>` : `<span class="sr-only">${STATUS_TEXT[st]}</span>`) });
+}
+const seriesColor = slot => `var(--s${(slot % SERIES_SLOTS) + 1})`;
+
+/* ------------------------------------------------------------------ runtime data */
+const rt = new Map();   // machineId -> runtime
+function runtime(m) {
+  let r = rt.get(m.id);
+  if (!r) {
+    r = { status: 'loading', error: '', inFlight: false, sys: null, sysAt: 0, sysBusy: false, lastOk: 0, hist: new Map(), slots: new Map(), ms: 0 };
+    rt.set(m.id, r);
+  }
+  return r;
+}
+function metricHist(r, id) {
+  let h = r.hist.get(id);
+  if (!h) { h = { series: new Map(), error: '', source: 'pdh', t: [] }; r.hist.set(id, h); }
+  return h;
+}
+function clearHistory() { for (const r of rt.values()) { r.hist.clear(); r.slots.clear(); r.sys = null; r.sysAt = 0; r.status = 'loading'; } demoState.clear(); }
+
+/** Aggregated (single) series for a metric - used by tiles, gauges, overview. */
+function aggSeries(h, def) {
+  if (!h || !h.t.length) return [];
+  if (!def.multi) { const s = h.series.values().next().value; return s ? s.pts : []; }
+  const out = [];
+  const lists = [...h.series.values()].map(s => s.pts);
+  const idx = lists.map(() => 0);
+  for (const t of h.t) {
+    const vals = [];
+    lists.forEach((pts, i) => {
+      while (idx[i] < pts.length && pts[idx[i]][0] < t) idx[i]++;
+      if (idx[i] < pts.length && pts[idx[i]][0] === t && isNum(pts[idx[i]][1])) vals.push(pts[idx[i]][1]);
+    });
+    let v = null;
+    if (vals.length) {
+      const a = def.agg || 'sum';
+      v = a === 'avg' ? vals.reduce((x, y) => x + y, 0) / vals.length : a === 'max' ? Math.max(...vals) : a === 'min' ? Math.min(...vals) : vals.reduce((x, y) => x + y, 0);
+    }
+    out.push([t, v]);
+  }
+  return out;
+}
+function lastVal(pts) { for (let i = pts.length - 1; i >= 0; i--) if (isNum(pts[i][1])) return pts[i][1]; return null; }
+function valueAt(pts, t) { for (let i = pts.length - 1; i >= 0; i--) if (pts[i][0] <= t) return isNum(pts[i][1]) ? pts[i][1] : null; return null; }
+
+function ingest(m, r, t, results) {
+  const sys = r.sys;
+  let errors = 0, oks = 0;
+  for (const id of m.metrics) {
+    const def = metricDef(id);
+    if (!def) continue;
+    const res = results[def.path];
+    const h = metricHist(r, id);
+    if (!res) continue;
+    if (!res.ok) { h.error = res.error || 'Counter unavailable.'; errors++; continue; }
+    oks++;
+    h.error = ''; h.source = res.source || 'pdh';
+    const xf = def.xf ? XF[def.xf] : null;
+    const excl = (def.exclude || []).map(s => s.toLowerCase());
+    let vals = (res.values || []).filter(v => !def.multi || !excl.includes(String(v.instance).toLowerCase()));
+    if (!def.multi) vals = vals.slice(0, 1);
+    h.t.push(t);
+    for (const v of vals) {
+      const key = def.multi ? String(v.instance || '(default)') : '';
+      let s = h.series.get(key);
+      if (!s) { s = { key, pts: [] }; h.series.set(key, s); }
+      let val = isNum(v.value) ? v.value : null;
+      if (val !== null && xf) val = xf(val, sys);
+      s.pts.push([t, isNum(val) ? val : null]);
+    }
+  }
+  prune(r);
+  return { errors, oks };
+}
+function prune(r) {
+  const cut = Date.now() - MAX_KEEP_MIN * 60000;
+  for (const h of r.hist.values()) {
+    if (h.t.length && h.t[0] < cut) h.t = h.t.filter(x => x >= cut);
+    for (const [k, s] of h.series) {
+      if (s.pts.length && s.pts[0][0] < cut) s.pts = s.pts.filter(p => p[0] >= cut);
+      if (!s.pts.length) h.series.delete(k);
+    }
+  }
+}
+
+/* ------------------------------------------------------------------ agent API */
+function hubUrl() {
+  const u = (config.settings.hubUrl || '').trim();
+  if (u) return u.replace(/\/+$/, '');
+  if (/^https?:$/.test(location.protocol)) return location.origin;
+  return 'http://localhost:8765';
+}
+function endpointFor(m) {
+  if (m && m.agentUrl) return { base: m.agentUrl.replace(/\/+$/, ''), key: m.apiKey };
+  return { base: hubUrl(), key: config.settings.hubKey };
+}
+async function api(m, path, { method = 'GET', body, timeout = 20000 } = {}) {
+  const { base, key } = endpointFor(m);
+  const ctl = new AbortController();
+  const timer = setTimeout(() => ctl.abort(), timeout);
+  try {
+    const headers = {};
+    if (body !== undefined) headers['Content-Type'] = 'application/json';
+    if (key) headers['X-MM-Key'] = key;
+    const res = await fetch(base + path, { method, headers, body: body === undefined ? undefined : (typeof body === 'string' ? body : JSON.stringify(body)), signal: ctl.signal, cache: 'no-store' });
+    const text = await res.text();
+    let data;
+    try { data = JSON.parse(text); } catch { throw new Error(`Agent returned HTTP ${res.status} (not JSON).`); }
+    if (!res.ok && data && data.error) throw new Error(data.error);
+    if (!res.ok) throw new Error(`Agent returned HTTP ${res.status}.`);
+    return data;
+  } catch (e) {
+    if (e.name === 'AbortError') throw new Error(`Timed out after ${Math.round(timeout / 1000)} s contacting ${base}.`);
+    if (e instanceof TypeError) throw new Error(`Cannot reach agent at ${base}.`);
+    throw e;
+  } finally { clearTimeout(timer); }
+}
+
+/* ------------------------------------------------------------------ demo data */
+const demoState = new Map();
+function demoValue(m, def, inst, t) {
+  const key = m.id + '|' + def.id + '|' + inst;
+  let s = demoState.get(key);
+  const [base, amp] = def.demo || { pct: [35, 25], persec: [300, 200], bps: [2e6, 1.5e6], bytes: [1e9, 1e8], mb: [4000, 600], ms: [8, 6], sec: [900, 200] }[def.unit] || [100, 60];
+  if (!s) {
+    const rnd = rng(hashStr(key));
+    const b = base * (0.6 + rnd() * 0.8);
+    s = { rnd, v: b, b, phase: rnd() * Math.PI * 2 };
+    demoState.set(key, s);
+  }
+  if (def.unit === 'duration') { if (!s.t0) s.t0 = t; return s.b + (t - s.t0) / 1000; }
+  const wave = Math.sin(t / 47000 + s.phase) * amp * 0.35;
+  const spike = s.rnd() < 0.015 ? amp * (0.8 + s.rnd()) : 0;
+  s.v += (s.rnd() - 0.5) * amp * 0.28 + (s.b + wave - s.v) * 0.18;
+  let v = Math.max(0, s.v + spike);
+  if (def.max) v = Math.min(def.max, v);
+  if (def.unit === 'count' && def.id !== 'cpu.queue' && def.id !== 'disk.queue') v = Math.round(v);
+  return v;
+}
+function demoSample(m, paths, t = Date.now()) {
+  const results = {};
+  const byPath = new Map();
+  for (const id of m.metrics) { const d = metricDef(id); if (d) byPath.set(d.path, d); }
+  for (const p of paths) {
+    const def = byPath.get(p);
+    if (!def) continue;
+    if (def.role && !m.roles.includes(def.role)) {
+      const set = (p.match(/^\\([^\\(]+)/) || [])[1] || 'counter';
+      results[p] = { ok: false, error: `Counter set '${set}' is not installed on this machine.`, values: [] };
+      continue;
+    }
+    const raw = def.xf === 'memUsed' || def.id === 'mem.avail' ? 'mem' : def.xf === 'idleToBusy' ? 'idle' : null;
+    const insts = def.multi ? (def.demoInst || ['A', 'B']) : [''];
+    results[p] = {
+      ok: true, source: 'pdh', values: insts.map(inst => {
+        let v = demoValue(m, def, inst, t);
+        // keep the raw counter semantics so transforms behave like the real thing
+        if (raw === 'mem') { const tot = 32768; v = def.id === 'mem.used' ? tot * (1 - v / 100) : v; }
+        if (raw === 'idle') v = 100 - v;
+        if (def.xf === 'perCpu') v = v * 8;   // raw process counter is % of one core; demo hosts have 8
+        return { instance: inst || '_total', value: v };
+      }),
+    };
+  }
+  return { ok: true, results };
+}
+function demoSys(m) {
+  const r = rng(hashStr(m.id));
+  const cores = [4, 8, 16][Math.floor(r() * 3)];
+  const mem = 32768 * 1024;
+  return {
+    ok: true, computer: m.host.toUpperCase(), os: 'Microsoft Windows Server 2022 Datacenter', osVersion: '10.0.20348', osBuild: '20348',
+    manufacturer: 'Demo', model: 'Virtual Machine', cpuName: 'Intel(R) Xeon(R) Gold 6338 CPU @ 2.00GHz', sockets: 1, cores, logicalCpus: 8,
+    totalMemoryKB: mem, freeMemoryKB: mem * 0.4, uptimeSec: 864000 + Math.floor(r() * 2e6),
+    disks: [{ name: 'C:', label: 'System', size: 256e9, free: 256e9 * (0.2 + r() * 0.5) }, { name: 'D:', label: 'Data', size: 1024e9, free: 1024e9 * (0.05 + r() * 0.6) }],
+  };
+}
+
+/* ------------------------------------------------------------------ polling */
+let pollTimer = null, hubTimer = null;
+function metricPaths(m) {
+  const set = new Set();
+  for (const id of m.metrics) { const d = metricDef(id); if (d) set.add(d.path); }
+  return [...set];
+}
+async function refreshSys(m, r, force = false) {
+  if (r.sysBusy || (!force && Date.now() - r.sysAt < 60000)) return;
+  r.sysBusy = true;
+  try {
+    const sys = state.mode === 'demo' ? demoSys(m) : await api(m, '/api/sysinfo?computer=' + encodeURIComponent(m.host || 'localhost'), { timeout: 25000 });
+    if (sys && sys.ok) { r.sys = sys; r.sysAt = Date.now(); r.sysError = ''; }
+    else { r.sysError = (sys && sys.error) || 'System info unavailable.'; r.sysAt = Date.now() - 45000; }
+  } catch (e) { r.sysError = e.message; r.sysAt = Date.now() - 45000; }
+  finally { r.sysBusy = false; }
+}
+async function pollMachine(m) {
+  const r = runtime(m);
+  if (r.inFlight) return;
+  const paths = metricPaths(m);
+  const needSys = m.metrics.some(id => { const d = metricDef(id); return d && d.xf && d.xf !== 'idleToBusy' && d.xf !== 'secToMs'; });
+  r.inFlight = true;
+  const mode = state.mode;
+  try {
+    if (needSys && !r.sys) await refreshSys(m, r, true); else refreshSys(m, r);
+    if (!paths.length) { r.status = 'ok'; r.error = ''; return; }
+    if (mode === 'demo' && !r.lastOk) {
+      // Backfill a window of simulated history so demo charts are populated immediately.
+      const step = config.settings.refreshSec * 1000, now = Date.now();
+      const n = Math.min(720, Math.floor(config.settings.windowMin * 60000 / step));
+      for (let k = n; k >= 1; k--) ingest(m, r, now - k * step, demoSample(m, paths, now - k * step).results);
+    }
+    const started = performance.now();
+    const res = mode === 'demo' ? demoSample(m, paths) : await api(m, '/api/sample', { method: 'POST', body: { computer: m.host || 'localhost', paths }, timeout: Math.max(15000, config.settings.refreshSec * 3000) });
+    if (mode !== state.mode || !config.machines.includes(m)) return; // mode changed mid-flight
+    r.ms = mode === 'demo' ? 20 + (hashStr(m.id) % 90) + Math.round(Math.random() * 15) : Math.round(performance.now() - started);
+    if (!res.ok) { r.status = 'error'; r.error = res.error || 'Sample failed.'; return; }
+    const { errors, oks } = ingest(m, r, Date.now(), res.results || {});
+    r.status = errors && oks ? 'partial' : errors ? 'partial' : 'ok';
+    r.error = ''; r.lastOk = Date.now();
+  } catch (e) {
+    r.status = 'error'; r.error = e.message;
+  } finally {
+    r.inFlight = false;
+    scheduleRender();
+  }
+}
+function tick() {
+  if (state.paused || !config) return;
+  for (const m of config.machines) pollMachine(m);
+}
+function restartPolling() {
+  clearInterval(pollTimer);
+  pollTimer = setInterval(tick, config.settings.refreshSec * 1000);
+  tick();
+}
+async function checkHub() {
+  try {
+    const info = await api(null, '/api/ping', { timeout: 3500 });
+    state.hubOk = !!(info && info.ok && info.agent === 'MultiMonitor');
+    state.hubInfo = info; state.hubError = state.hubOk ? '' : 'Unexpected response from agent.';
+  } catch (e) { state.hubOk = false; state.hubInfo = null; state.hubError = e.message; }
+  const mode = config.settings.mode === 'demo' ? 'demo' : config.settings.mode === 'live' ? 'live' : state.hubOk ? 'live' : 'demo';
+  const usesOwnAgents = config.machines.some(m => m.agentUrl);
+  const next = config.settings.mode === 'auto' && !state.hubOk && usesOwnAgents ? 'live' : mode;
+  if (next !== state.mode) { state.mode = next; clearHistory(); restartPolling(); }
+  renderTopbar();
+  renderBanner();
+}
+function startHubWatch() { clearInterval(hubTimer); hubTimer = setInterval(checkHub, 15000); return checkHub(); }
+
+/* ------------------------------------------------------------------ charts */
+let chartSeq = 0;
+const CHARTS = new Set();
+function niceStep(range, count) {
+  const raw = range / Math.max(1, count);
+  const p = Math.pow(10, Math.floor(Math.log10(raw)));
+  const f = raw / p;
+  return (f <= 1 ? 1 : f <= 2 ? 2 : f <= 2.5 ? 2.5 : f <= 5 ? 5 : 10) * p;
+}
+function yScaleFor(unit, maxVal, fixedMax) {
+  if (isNum(fixedMax)) {
+    const step = fixedMax / 4;
+    return { max: fixedMax, ticks: [0, 1, 2, 3, 4].map(i => i * step) };
+  }
+  let mv = maxVal > 0 ? maxVal * 1.12 : 1;
+  let mult = 1;
+  if (UNITS[unit] && UNITS[unit].bin) { while (mv / mult >= 1024) mult *= 1024; }
+  if (unit === 'mb') { while (mv / mult >= 1024) mult *= 1024; }
+  const step = niceStep(mv / mult, 4) * mult;
+  const max = Math.ceil(mv / step) * step;
+  const ticks = [];
+  for (let v = 0; v <= max + step / 2; v += step) ticks.push(v);
+  return { max, ticks };
+}
+const TIME_STEPS = [5, 10, 15, 30, 60, 120, 300, 600, 900, 1800, 3600].map(s => s * 1000);
+function timeTicks(t0, t1, width) {
+  const want = Math.max(2, Math.floor(width / 90));
+  const step = TIME_STEPS.find(s => (t1 - t0) / s <= want) || 3600000;
+  const out = [];
+  for (let t = Math.ceil(t0 / step) * step; t <= t1; t += step) out.push(t);
+  return { ticks: out, step };
+}
+function fmtTime(t, step) {
+  const d = new Date(t);
+  const hh = String(d.getHours()).padStart(2, '0'), mm = String(d.getMinutes()).padStart(2, '0'), ss = String(d.getSeconds()).padStart(2, '0');
+  return step < 60000 ? `${hh}:${mm}:${ss}` : `${hh}:${mm}`;
+}
+function fmtClock(t) { return new Date(t).toLocaleTimeString(); }
+/** Downsample to ~2 points per pixel column keeping min & max, so spikes survive. */
+function decimate(pts, x, px) {
+  if (pts.length <= px * 2) return pts;
+  const out = [];
+  let col = null, lo = null, hi = null, gapBefore = false;
+  const flush = () => { if (lo) { if (lo[0] <= hi[0]) { out.push(lo); if (hi !== lo) out.push(hi); } else { out.push(hi); out.push(lo); } } lo = hi = null; };
+  for (const p of pts) {
+    if (!isNum(p[1])) { flush(); out.push(p); gapBefore = true; continue; }
+    const c = Math.floor(x(p[0]));
+    if (c !== col) { flush(); col = c; }
+    if (!lo || p[1] < lo[1]) lo = p;
+    if (!hi || p[1] > hi[1]) hi = p;
+  }
+  flush();
+  return out;
+}
+
+class LineChart {
+  constructor(host) {
+    this.host = host; this.id = 'c' + (++chartSeq); this.data = null; this.hover = null; this.focusIdx = null;
+    host.classList.add('chart');
+    host.tabIndex = 0;
+    host.setAttribute('role', 'img');
+    host.innerHTML = '<svg class="base" aria-hidden="true"></svg><svg class="overlay" aria-hidden="true"></svg>';
+    this.base = host.firstChild; this.overlay = host.lastChild;
+    host.addEventListener('pointermove', e => { const b = host.getBoundingClientRect(); this.hover = { x: e.clientX - b.left, cx: e.clientX, cy: e.clientY }; this.focusIdx = null; this.drawOverlay(); });
+    host.addEventListener('pointerleave', () => { this.hover = null; this.drawOverlay(); });
+    host.addEventListener('keydown', e => {
+      if (!this.geo || !this.geo.times.length) return;
+      const n = this.geo.times.length;
+      if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+        e.preventDefault();
+        this.focusIdx = this.focusIdx == null ? n - 1 : clamp(this.focusIdx + (e.key === 'ArrowLeft' ? -1 : 1), 0, n - 1);
+        this.hover = null; this.drawOverlay();
+      } else if (e.key === 'Escape') { this.focusIdx = null; this.drawOverlay(); }
+    });
+    host.addEventListener('blur', () => { this.focusIdx = null; this.drawOverlay(); });
+    this.ro = new ResizeObserver(debounce(() => this.draw(), 50));
+    this.ro.observe(host);
+    CHARTS.add(this);
+  }
+  destroy() { this.ro.disconnect(); CHARTS.delete(this); }
+  /** data: { series:[{key,label,color,pts}], t0, t1, unit, max, thresholds:[{v,level}], fill, label } */
+  update(data) { this.data = data; this.draw(); }
+  draw() {
+    const d = this.data, W = this.host.clientWidth, H = this.host.clientHeight;
+    if (!d || !W || !H) return;
+    const series = d.series.filter(s => s.pts.length);
+    let mv = 0;
+    for (const s of series) for (const p of s.pts) if (p[0] >= d.t0 && isNum(p[1]) && p[1] > mv) mv = p[1];
+    for (const t of d.thresholds || []) if (isNum(t.v) && t.v > mv && t.v <= mv * 1.6) mv = t.v;
+    const ys = yScaleFor(d.unit, mv, d.max);
+    const labels = ys.ticks.map(v => fmtVal(d.unit, v));
+    const ml = Math.min(84, Math.max(30, ...labels.map(l => l.length * 6.6 + 10)));
+    const mt = 8, mr = 14, mb = 22;
+    const iw = Math.max(10, W - ml - mr), ih = Math.max(10, H - mt - mb);
+    const x = t => ml + (t - d.t0) / (d.t1 - d.t0) * iw;
+    const y = v => mt + ih - clamp(v / ys.max, 0, 1.02) * ih;
+    let out = '';
+    // grid + y labels
+    ys.ticks.forEach((v, i) => {
+      const yy = Math.round(y(v)) + 0.5;
+      out += `<line x1="${ml}" x2="${ml + iw}" y1="${yy}" y2="${yy}" stroke="${i === 0 ? 'var(--axis)' : 'var(--grid)'}" stroke-width="1"/>`;
+      out += `<text x="${ml - 8}" y="${yy + 4}" text-anchor="end" font-size="11" fill="var(--muted)" style="font-variant-numeric:tabular-nums">${esc(labels[i])}</text>`;
+    });
+    const tt = timeTicks(d.t0, d.t1, iw);
+    for (const t of tt.ticks) {
+      const xx = x(t);
+      if (xx < ml + 16 || xx > ml + iw - 16) continue;
+      out += `<text x="${xx}" y="${H - 5}" text-anchor="middle" font-size="11" fill="var(--muted)" style="font-variant-numeric:tabular-nums">${fmtTime(t, tt.step)}</text>`;
+    }
+    // thresholds
+    for (const th of d.thresholds || []) {
+      if (!isNum(th.v) || th.v > ys.max || th.v < 0) continue;
+      const yy = Math.round(y(th.v)) + 0.5;
+      const col = th.level === 'critical' ? 'var(--critical)' : 'var(--warning)';
+      out += `<line x1="${ml}" x2="${ml + iw}" y1="${yy}" y2="${yy}" stroke="${col}" stroke-width="1" opacity=".75"/>`;
+      out += `<text x="${ml + iw}" y="${yy - 4}" text-anchor="end" font-size="10.5" fill="var(--muted)">${th.level === 'critical' ? 'critical' : 'warning'} ${esc(fmtVal(d.unit, th.v))}</text>`;
+    }
+    // series
+    const defs = [];
+    const clipId = this.id + 'clip';
+    defs.push(`<clipPath id="${clipId}"><rect x="${ml}" y="${mt - 4}" width="${iw + 6}" height="${ih + 8}"/></clipPath>`);
+    let paths = '';
+    const single = series.length === 1;
+    series.forEach((s, si) => {
+      const pts = decimate(s.pts.filter(p => p[0] >= d.t0 - (d.t1 - d.t0) * 0.02), x, iw);
+      let line = '', area = '', seg = [];
+      const flushSeg = () => {
+        if (!seg.length) return;
+        line += 'M' + seg.map(p => `${x(p[0]).toFixed(1)},${y(p[1]).toFixed(1)}`).join('L');
+        if (d.fill && single) {
+          area += `M${x(seg[0][0]).toFixed(1)},${y(0)}L` + seg.map(p => `${x(p[0]).toFixed(1)},${y(p[1]).toFixed(1)}`).join('L') + `L${x(seg[seg.length - 1][0]).toFixed(1)},${y(0)}Z`;
+        }
+        seg = [];
+      };
+      for (const p of pts) { if (isNum(p[1])) seg.push(p); else flushSeg(); }
+      flushSeg();
+      if (area) {
+        const gid = this.id + 'g' + si;
+        defs.push(`<linearGradient id="${gid}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" style="stop-color:${s.color};stop-opacity:.30"/><stop offset=".7" style="stop-color:${s.color};stop-opacity:.06"/><stop offset="1" style="stop-color:${s.color};stop-opacity:0"/></linearGradient>`);
+        paths += `<path d="${area}" fill="url(#${gid})" stroke="none"/>`;
+      }
+      if (line) paths += `<path d="${line}" fill="none" style="stroke:${s.color}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>`;
+    });
+    // end marker + direct label for a single series
+    let endMark = '';
+    if (single) {
+      const s = series[0];
+      for (let i = s.pts.length - 1; i >= 0; i--) {
+        const p = s.pts[i];
+        if (isNum(p[1])) { endMark = `<circle cx="${x(p[0]).toFixed(1)}" cy="${y(p[1]).toFixed(1)}" r="4.5" style="fill:${s.color}" stroke="var(--surface)" stroke-width="2"/>`; break; }
+      }
+    }
+    this.base.innerHTML = `<defs>${defs.join('')}</defs>${out}<g clip-path="url(#${clipId})">${paths}</g>${endMark}`;
+    // geometry for the hover layer
+    const times = [...new Set(series.flatMap(s => s.pts.map(p => p[0])).filter(t => t >= d.t0))].sort((a, b) => a - b);
+    this.geo = { x, y, ml, mt, iw, ih, times, series, W, H };
+    const lastT = times[times.length - 1];
+    this.host.setAttribute('aria-label', `${d.label || 'Chart'}: ${series.length} series${lastT ? ', latest ' + series.map(s => `${s.label || d.label} ${fmtVal(d.unit, valueAt(s.pts, lastT))}`).join(', ') : ', no data yet'}`);
+    this.drawOverlay();
+  }
+  drawOverlay() {
+    const g = this.geo, tip = $('#tooltip');
+    if (!g || !g.times.length || (this.hover == null && this.focusIdx == null)) { this.overlay.innerHTML = ''; if (tipOwner === this) { tip.style.display = 'none'; tipOwner = null; } return; }
+    let t;
+    if (this.focusIdx != null) t = g.times[clamp(this.focusIdx, 0, g.times.length - 1)];
+    else {
+      if (this.hover.x < g.ml - 10 || this.hover.x > g.ml + g.iw + 10) { this.overlay.innerHTML = ''; tip.style.display = 'none'; return; }
+      let best = g.times[0], bd = Infinity;
+      for (const tm of g.times) { const dd = Math.abs(g.x(tm) - this.hover.x); if (dd < bd) { bd = dd; best = tm; } }
+      t = best;
+    }
+    const xx = Math.round(g.x(t)) + 0.5;
+    let o = `<line x1="${xx}" x2="${xx}" y1="${g.mt}" y2="${g.mt + g.ih}" stroke="var(--text-2)" stroke-width="1" opacity=".55"/>`;
+    const rows = [];
+    for (const s of g.series) {
+      const p = s.pts.find(q => q[0] === t);
+      const v = p ? p[1] : null;
+      if (isNum(v)) o += `<circle cx="${xx}" cy="${g.y(v).toFixed(1)}" r="4.5" style="fill:${s.color}" stroke="var(--surface)" stroke-width="2"/>`;
+      rows.push({ s, v });
+    }
+    this.overlay.innerHTML = o;
+    rows.sort((a, b) => (b.v ?? -Infinity) - (a.v ?? -Infinity));
+    tip.replaceChildren(el('div', { class: 'tt', text: `${this.data.label ? this.data.label + ' · ' : ''}${fmtClock(t)}` }),
+      ...rows.map(({ s, v }) => el('div', { class: 'r' }, el('i', { class: 'ln', style: { background: s.color } }), el('b', { text: fmtVal(this.data.unit, v) }), el('span', { text: s.label || '' }))));
+    tip.style.display = 'block';
+    tipOwner = this;
+    const box = this.host.getBoundingClientRect();
+    const tw = tip.offsetWidth, th = tip.offsetHeight;
+    let left = box.left + xx + 14, top = (this.hover ? this.hover.cy : box.top + g.mt) - th / 2;
+    if (left + tw > innerWidth - 8) left = box.left + xx - tw - 14;
+    tip.style.left = clamp(left, 8, innerWidth - tw - 8) + 'px';
+    tip.style.top = clamp(top, 8, innerHeight - th - 8) + 'px';
+  }
+}
+let tipOwner = null;
+
+function sparkSVG(pts, t0, t1, color, w = 96, h = 30, max) {
+  const vals = pts.filter(p => p[0] >= t0 && isNum(p[1]));
+  if (vals.length < 2) return `<svg class="spark" viewBox="0 0 ${w} ${h}" aria-hidden="true"></svg>`;
+  let lo = Math.min(...vals.map(p => p[1])), hi = Math.max(...vals.map(p => p[1]));
+  if (isNum(max)) { lo = 0; hi = Math.max(hi, max * 0.25); }
+  if (hi - lo < 1e-9) { hi += 1; lo = Math.max(0, lo - 1); }
+  const x = t => 2 + (t - t0) / (t1 - t0) * (w - 8);
+  const y = v => 3 + (1 - (v - lo) / (hi - lo)) * (h - 7);
+  const d = 'M' + vals.map(p => `${x(p[0]).toFixed(1)},${y(p[1]).toFixed(1)}`).join('L');
+  const last = vals[vals.length - 1];
+  const gid = 'sp' + (++chartSeq);
+  const area = d + `L${x(last[0]).toFixed(1)},${h}L${x(vals[0][0]).toFixed(1)},${h}Z`;
+  return `<svg class="spark" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" aria-hidden="true"><defs><linearGradient id="${gid}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" style="stop-color:${color};stop-opacity:.28"/><stop offset="1" style="stop-color:${color};stop-opacity:0"/></linearGradient></defs>` +
+    `<path d="${area}" fill="url(#${gid})"/><path d="${d}" fill="none" style="stroke:${color}" stroke-width="1.75" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>` +
+    `<circle cx="${x(last[0]).toFixed(1)}" cy="${y(last[1]).toFixed(1)}" r="3" style="fill:${color}" stroke="var(--surface)" stroke-width="1.5"/></svg>`;
+}
+function gaugeSVG(v, max, st) {
+  const w = 118, h = 70, cx = w / 2, cy = 62, r = 50;
+  const frac = isNum(v) ? clamp(v / (max || 100), 0, 1) : 0;
+  const pt = f => { const a = Math.PI * (1 - f); return [cx + r * Math.cos(a), cy - r * Math.sin(a)]; };
+  const [x0, y0] = pt(0), [x1, y1] = pt(1), [xv, yv] = pt(frac);
+  const col = st === 'critical' ? 'var(--critical)' : st === 'warning' ? 'var(--warning)' : 'var(--s1)';
+  const track = `<path d="M${x0},${y0} A${r},${r} 0 0 1 ${x1},${y1}" fill="none" style="stroke:color-mix(in srgb, ${col} 18%, var(--surface-3))" stroke-width="10" stroke-linecap="round"/>`;
+  const arc = frac > 0.001 ? `<path d="M${x0},${y0} A${r},${r} 0 0 1 ${xv.toFixed(2)},${yv.toFixed(2)}" fill="none" style="stroke:${col}" stroke-width="10" stroke-linecap="round"/>` : '';
+  return `<svg class="gauge" viewBox="0 0 ${w} ${h}" aria-hidden="true">${track}${arc}<text x="${cx}" y="${cy - 4}" text-anchor="middle" font-size="17" font-weight="650" fill="var(--text-1)">${isNum(v) ? esc(nf0.format(v)) + '%' : '—'}</text></svg>`;
+}
+
+/* ------------------------------------------------------------------ rendering */
+let renderQueued = false;
+const cardUpdaters = [];
+function scheduleRender() {
+  if (renderQueued) return;
+  renderQueued = true;
+  requestAnimationFrame(() => { renderQueued = false; updateView(); renderSidebarMachines(); });
+}
+function timeDomain() { const t1 = Date.now(); return { t0: t1 - config.settings.windowMin * 60000, t1 }; }
+
+function applyTheme() {
+  const t = config.settings.theme;
+  if (t === 'auto') document.documentElement.removeAttribute('data-theme');
+  else document.documentElement.setAttribute('data-theme', t);
+  $('#btnTheme').innerHTML = icon(t === 'dark' ? 'moon' : t === 'light' ? 'sun' : 'auto');
+  $('#btnTheme').title = `Theme: ${t}`;
+}
+
+function renderTopbar() {
+  $('#cfgName').value = config.name;
+  $('#dirtyDot').classList.toggle('on', state.dirty);
+  const pill = $('#modePill'), txt = $('#modeText');
+  pill.className = 'pill ' + (state.mode === 'demo' ? 'demo' : state.hubOk || config.machines.some(m => m.agentUrl) ? 'live' : 'off');
+  txt.textContent = state.mode === 'demo' ? 'Demo data' : state.hubOk ? `Live · ${state.hubInfo.computer}` : 'Agent offline';
+  pill.title = state.mode === 'demo' ? 'Showing simulated data. Start MultiMonitor.ps1 to see real counters.' : state.hubOk ? `Agent ${state.hubInfo.version} at ${hubUrl()} running as ${state.hubInfo.user}` : state.hubError;
+  $('#selWindow').value = String(config.settings.windowMin);
+  const sr = $('#selRefresh');
+  if (![...sr.options].some(o => o.value === String(config.settings.refreshSec))) sr.append(el('option', { value: config.settings.refreshSec, text: `Every ${config.settings.refreshSec} s` }));
+  sr.value = String(config.settings.refreshSec);
+  $('#btnPause').innerHTML = icon(state.paused ? 'play' : 'pause');
+  $('#btnPause').title = state.paused ? 'Resume updates' : 'Pause updates';
+  $('#btnPause').setAttribute('aria-label', $('#btnPause').title);
+  $('#btnPause').classList.toggle('primary', state.paused);
+  document.title = `${config.name} · MultiMonitor`;
+}
+
+function renderSidebar() {
+  const side = $('#sidebar');
+  side.replaceChildren();
+  const nav = el('div', { class: 'side-sec' });
+  nav.append(el('div', { class: 'side-title' }, 'Views'));
+  nav.append(el('button', { class: 'nav-item' + (state.view === 'overview' ? ' active' : ''), onclick: () => setView('overview'), html: icon('grid') + '<span class="txt"><span class="nm">Fleet overview</span><span class="sub">All machines at a glance</span></span>' }));
+  side.append(nav);
+
+  const ms = el('div', { class: 'side-sec' });
+  ms.append(el('div', { class: 'side-title' }, el('span', { text: `Machines (${config.machines.length})` }),
+    el('button', { class: 'btn sm ghost', title: 'Add machine', onclick: () => machineDialog(), html: icon('plus') + 'Add' })));
+  ms.append(el('div', { id: 'machineList' }));
+  side.append(ms);
+
+  const cur = currentMachine();
+  if (cur) side.append(renderPicker(cur));
+  side.append(el('div', { class: 'side-foot' }, `MultiMonitor ${APP_VERSION} · `, el('a', { href: '#', style: { color: 'inherit' }, onclick: e => { e.preventDefault(); helpDialog(); }, text: 'Help' })));
+  renderSidebarMachines();
+}
+function renderSidebarMachines() {
+  const list = $('#machineList');
+  if (!list) return;
+  const { t0, t1 } = timeDomain();
+  const existing = new Map([...list.children].map(n => [n.dataset.id, n]));
+  const frag = [];
+  for (const m of config.machines) {
+    const r = runtime(m);
+    const cpu = r.hist.get('cpu.total') || r.hist.get(m.metrics[0]);
+    const def = metricDef(cpu === r.hist.get('cpu.total') ? 'cpu.total' : m.metrics[0]);
+    const pts = cpu && def ? aggSeries(cpu, def) : [];
+    let n = existing.get(m.id);
+    if (!n) {
+      n = el('button', { class: 'nav-item', dataset: { id: m.id }, onclick: () => setView(m.id) });
+      n.addEventListener('contextmenu', e => { e.preventDefault(); machineMenu(m, n); });
+    }
+    const sub = r.status === 'error' ? r.error : `${m.host}${pts.length && def ? ' · ' + def.label + ' ' + fmtVal(def.unit, lastVal(pts)) : ''}`;
+    n.className = 'nav-item' + (state.view === m.id ? ' active' : '');
+    n.title = `${m.name} (${m.host}) - ${r.status}${r.error ? ': ' + r.error : ''}`;
+    n.innerHTML = `<span class="mchip" style="background:${seriesColor(m.colorSlot)}"></span><span class="txt"><span class="nm">${esc(m.name)}</span><span class="sub">${esc(sub)}</span></span>${sparkSVG(pts, t0, t1, seriesColor(m.colorSlot), 64, 24, def && def.max)}<span class="sdot ${r.status}"></span>`;
+    frag.push(n);
+  }
+  list.replaceChildren(...frag);
+}
+function renderPicker(m) {
+  const sec = el('div', { class: 'side-sec', id: 'picker' });
+  sec.append(el('div', { class: 'side-title' }, el('span', { text: `Metrics · ${m.name}` }),
+    el('button', { class: 'btn sm ghost', title: 'Browse all counters on this machine', onclick: () => browserDialog(m), html: icon('list') + 'Browse' })));
+  const search = el('input', { class: 'inp', type: 'search', placeholder: 'Search metrics…', 'aria-label': 'Search metrics' });
+  sec.append(el('div', { class: 'picker-search', html: icon('search') }, search));
+  const presets = el('div', { class: 'presets' });
+  for (const [name, ids] of Object.entries(PRESETS)) {
+    presets.append(el('button', { class: 'btn sm', title: `Add: ${ids.map(i => CATALOG_BY_ID.get(i).label).join(', ')}`, text: '+ ' + name, onclick: () => {
+      const before = m.metrics.length;
+      for (const id of ids) if (!m.metrics.includes(id)) m.metrics.push(id);
+      toast(`${m.metrics.length - before} metric(s) added from “${name}”.`, 'ok');
+      metricsChanged(m);
+    } }));
+  }
+  sec.append(presets);
+  const holder = el('div');
+  sec.append(holder);
+  const build = () => {
+    const q = search.value.trim().toLowerCase();
+    holder.replaceChildren();
+    const all = [...CATALOG, ...config.customMetrics];
+    for (const [cat, label] of CATEGORIES) {
+      const items = all.filter(d => d.cat === cat && (!q || (d.label + ' ' + d.path + ' ' + (d.desc || '')).toLowerCase().includes(q)));
+      if (!items.length && (q || cat !== 'custom')) continue;
+      const selCount = items.filter(d => m.metrics.includes(d.id)).length;
+      const det = el('details', { class: 'cat', open: !!q || selCount > 0 || undefined });
+      det.append(el('summary', { html: icon('chevron', 'i chev') }, el('span', { text: label }), el('span', { class: 'cnt' + (selCount ? ' on' : ''), text: selCount ? `${selCount}/${items.length}` : String(items.length) })));
+      for (const d of items) {
+        const cb = el('input', { type: 'checkbox', checked: m.metrics.includes(d.id) || undefined });
+        cb.addEventListener('change', () => {
+          if (cb.checked) { if (!m.metrics.includes(d.id)) m.metrics.push(d.id); }
+          else m.metrics = m.metrics.filter(x => x !== d.id);
+          metricsChanged(m, false);
+          const c = det.querySelector('.cnt'); const n = items.filter(x => m.metrics.includes(x.id)).length;
+          c.textContent = n ? `${n}/${items.length}` : String(items.length); c.classList.toggle('on', n > 0);
+        });
+        const row = el('label', { class: 'metric-opt', title: d.path }, cb, el('span', {}, el('div', { text: d.label }), el('div', { class: 'd', text: d.desc || d.path })));
+        if (d.cat === 'custom') row.append(el('button', { class: 'btn sm ghost icon del', title: 'Delete custom counter', 'aria-label': 'Delete custom counter', html: icon('trash'), onclick: e => { e.preventDefault(); deleteCustom(d); } }));
+        det.append(row);
+      }
+      if (cat === 'custom') det.append(el('div', { style: { padding: '4px 8px 8px 12px' } }, el('button', { class: 'btn sm', html: icon('plus') + 'Add counter path', onclick: () => customDialog(m) })));
+      holder.append(det);
+    }
+  };
+  search.addEventListener('input', debounce(build, 120));
+  build();
+  return sec;
+}
+function deleteCustom(d) {
+  config.customMetrics = config.customMetrics.filter(c => c.id !== d.id);
+  for (const m of config.machines) { m.metrics = m.metrics.filter(x => x !== d.id); delete m.thresholds[d.id]; delete m.layout[d.id]; }
+  markDirty(); renderSidebar(); renderMain();
+}
+function metricsChanged(m, rebuildSidebar = true) {
+  markDirty();
+  if (rebuildSidebar) renderSidebar();
+  renderMain();
+  pollMachine(m);
+}
+function currentMachine() { return config.machines.find(m => m.id === state.view) || null; }
+function setView(v) {
+  state.view = v;
+  $('#sidebar').classList.remove('open');
+  renderSidebar(); renderMain();
+  autosave();
+  $('#main').focus({ preventScroll: true });
+  scrollTo({ top: 0 });
+}
+
+function renderBanner() {
+  const main = $('#main');
+  let b = $('#banner');
+  const need = state.mode === 'demo' && config.settings.mode === 'auto';
+  if (!need) { if (b) b.remove(); return; }
+  if (!b) {
+    b = el('div', { class: 'banner', id: 'banner', role: 'note' });
+    main.prepend(b);
+  }
+  b.replaceChildren();
+  b.insertAdjacentHTML('afterbegin', icon('info'));
+  b.append(el('div', { class: 't' }, el('b', { text: 'Showing demo data. ' }),
+    `No MultiMonitor agent answered at ${hubUrl()}. Run `, el('span', { class: 'mono', text: 'MultiMonitor.ps1' }), ' on a Windows machine to see real counters. This page connects automatically once the agent is running.'),
+    el('button', { class: 'btn sm', html: icon('refresh') + 'Retry', onclick: () => checkHub() }),
+    el('button', { class: 'btn sm ghost', text: 'Settings', onclick: () => settingsDialog() }));
+}
+
+function renderMain() {
+  for (const c of CHARTS) c.destroy();
+  cardUpdaters.length = 0;
+  const main = $('#main');
+  main.replaceChildren();
+  renderBanner();
+  if (!config.machines.length) {
+    main.append(el('div', { class: 'empty-state' }, el('div', { class: 'ic', html: icon('server') }), el('h2', { text: 'Add your first machine' }),
+      el('p', { text: 'Monitor any Windows machine the agent can reach: CPU, memory, disks, network, IIS web services, SQL Server and any other performance counter.' }),
+      el('button', { class: 'btn primary', html: icon('plus') + 'Add machine', onclick: () => machineDialog() })));
+    return;
+  }
+  const m = currentMachine();
+  if (m) renderMachineView(main, m); else renderOverview(main);
+  updateView();
+}
+function updateView() { for (const u of cardUpdaters) { try { u(); } catch (e) { console.error(e); } } }
+
+/* ---------- overview */
+function renderOverview(main) {
+  main.append(el('div', { class: 'page-head' },
+    el('div', {}, el('h1', { text: 'Fleet overview' }), el('div', { class: 'sub', text: `${config.machines.length} machine(s) · refresh every ${config.settings.refreshSec} s · last ${config.settings.windowMin} min` })),
+    el('div', { class: 'acts' }, el('button', { class: 'btn', html: icon('plus') + 'Add machine', onclick: () => machineDialog() }))));
+
+  // headline stats
+  const stats = el('div', { class: 'stat-row' });
+  const mk = (lbl) => { const v = el('div', { class: 'val' }); const c = el('div', { class: 'card stat' }, el('div', { class: 'lbl', text: lbl }), v); stats.append(c); return v; };
+  const sOnline = mk('Machines reporting'), sWarn = mk('Warnings'), sCrit = mk('Critical'), sLat = mk('Avg. response time');
+  main.append(stats);
+  cardUpdaters.push(() => {
+    let on = 0, w = 0, c = 0, lat = 0, latN = 0;
+    for (const m of config.machines) {
+      const r = runtime(m);
+      if (r.status === 'ok' || r.status === 'partial') on++;
+      if (r.ms && r.status !== 'error') { lat += r.ms; latN++; }
+      for (const id of m.metrics) {
+        const def = metricDef(id); if (!def) continue;
+        const st = statusOf(lastVal(aggSeries(r.hist.get(id), def)), thresholdsFor(m, def));
+        if (st === 'warning') w++; if (st === 'critical') c++;
+      }
+    }
+    sOnline.innerHTML = `${on}<small> / ${config.machines.length}</small>`;
+    sWarn.replaceChildren(String(w), w ? statusBadge('warning', false) : '');
+    sCrit.replaceChildren(String(c), c ? statusBadge('critical', false) : '');
+    sLat.textContent = latN ? `${nf0.format(lat / latN)} ms` : '—';
+  });
+
+  // compare chart
+  const ids = [...new Set(config.machines.flatMap(m => m.metrics))].filter(id => metricDef(id));
+  if (ids.length && config.machines.length) {
+    if (!ids.includes(state.compareMetric)) state.compareMetric = ids.includes('cpu.total') ? 'cpu.total' : ids[0];
+    const sel = el('select', { class: 'sel', 'aria-label': 'Metric to compare' }, ids.map(id => el('option', { value: id, text: metricDef(id).label, selected: id === state.compareMetric || undefined })));
+    sel.addEventListener('change', () => { state.compareMetric = sel.value; updateView(); });
+    const host = el('div');
+    const legend = el('div', { class: 'legend' });
+    const card = el('section', { class: 'card', style: { marginTop: '16px' } },
+      el('div', { class: 'card-head' }, el('div', { class: 'ttl' }, el('h3', { text: 'Compare machines' }), el('div', { class: 'meta', text: 'One line per machine that reports the selected metric' })), sel),
+      el('div', { style: { height: '12px' } }), host, legend);
+    main.append(card);
+    const chart = new LineChart(host);
+    host.style.height = '230px';
+    cardUpdaters.push(() => {
+      const def = metricDef(state.compareMetric); if (!def) return;
+      const { t0, t1 } = timeDomain();
+      const series = config.machines.filter(m => m.metrics.includes(def.id)).map(m => ({ key: m.id, label: m.name, color: seriesColor(m.colorSlot), pts: aggSeries(runtime(m).hist.get(def.id), def) }));
+      chart.update({ series, t0, t1, unit: def.unit, max: def.max, fill: true, label: def.label, thresholds: [] });
+      legend.replaceChildren(...series.map(s => el('span', { class: 'k' }, el('i', { class: 'ln', style: { background: s.color } }), el('span', { text: `${s.label}  ${fmtVal(def.unit, lastVal(s.pts))}` }))));
+    });
+  }
+
+  main.append(el('div', { class: 'sec-title', text: 'Machines' }));
+  const grid = el('div', { class: 'fleet' });
+  main.append(grid);
+  for (const m of config.machines) {
+    const body = el('div');
+    const st = el('span', { class: 'st' });
+    const card = el('article', { class: 'card mcard', tabindex: 0, role: 'button', 'aria-label': `Open ${m.name}`, onclick: () => setView(m.id), onkeydown: e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setView(m.id); } } },
+      el('div', { class: 'mh' }, el('span', { class: 'mchip', style: { background: seriesColor(m.colorSlot), width: '12px', height: '12px' } }),
+        el('div', {}, el('div', { class: 'nm', text: m.name }), el('div', { class: 'host', text: m.host + (m.agentUrl ? ' · via ' + m.agentUrl : '') })), st), body);
+    grid.append(card);
+    cardUpdaters.push(() => {
+      const r = runtime(m);
+      const { t0, t1 } = timeDomain();
+      st.replaceChildren(el('span', { class: 'sdot ' + r.status, title: r.status }));
+      if (r.status === 'error' && !r.lastOk) { body.replaceChildren(el('div', { class: 'err', text: r.error })); return; }
+      const rows = m.metrics.slice(0, 6).map(id => {
+        const def = metricDef(id); if (!def) return null;
+        const h = r.hist.get(id);
+        const pts = aggSeries(h, def);
+        const v = lastVal(pts);
+        const row = el('div', { class: 'mrow' }, el('span', { class: 'l', text: def.label, title: def.label }),
+          el('span', { class: 'v', text: h && h.error && !pts.length ? 'n/a' : fmtVal(def.unit, v), title: h && h.error ? h.error : '' }));
+        row.insertAdjacentHTML('beforeend', sparkSVG(pts, t0, t1, seriesColor(m.colorSlot), 76, 22, def.max));
+        row.append(statusBadge(statusOf(v, thresholdsFor(m, def)), false));
+        return row;
+      }).filter(Boolean);
+      if (!rows.length) rows.push(el('div', { class: 'err', text: 'No metrics selected yet. Open the machine to choose some.' }));
+      if (m.metrics.length > 6) rows.push(el('div', { class: 'muted', style: { fontSize: '12px', paddingTop: '6px' }, text: `+${m.metrics.length - 6} more metric(s)` }));
+      if (r.status === 'error') rows.unshift(el('div', { class: 'err', text: '⚠ ' + r.error }));
+      body.replaceChildren(...rows);
+    });
+  }
+}
+
+/* ---------- machine view */
+function renderMachineView(main, m) {
+  const r = runtime(m);
+  const statusEl = el('span');
+  const head = el('div', { class: 'page-head' },
+    el('div', {}, el('h1', {}, el('span', { class: 'mchip', style: { background: seriesColor(m.colorSlot), display: 'inline-block', width: '14px', height: '14px', marginRight: '10px', verticalAlign: '2px' } }), m.name),
+      el('div', { class: 'sub' }, el('span', { class: 'mono', text: m.host }), m.agentUrl ? el('span', { class: 'muted', text: 'via ' + m.agentUrl }) : null, statusEl)),
+    el('div', { class: 'acts' },
+      el('button', { class: 'btn', html: icon('plus') + 'Add metrics', onclick: () => { $('#sidebar').classList.add('open'); const s = $('#picker input'); if (s) s.focus(); } }),
+      el('button', { class: 'btn', html: icon('edit') + 'Edit', onclick: () => machineDialog(m) }),
+      el('button', { class: 'btn icon', title: 'More', 'aria-label': 'More machine actions', html: icon('more'), onclick: e => machineMenu(m, e.currentTarget) })));
+  main.append(head);
+  cardUpdaters.push(() => {
+    const txt = r.status === 'ok' ? `Updated ${fmtClock(r.lastOk)} · ${r.ms} ms` : r.status === 'partial' ? `Some counters unavailable · ${r.ms} ms` : r.status === 'error' ? r.error : 'Connecting…';
+    statusEl.replaceChildren(el('span', { class: 'sdot ' + r.status, style: { display: 'inline-block', marginRight: '6px' } }), txt);
+  });
+
+  // system info
+  const sysCard = el('section', { class: 'card' });
+  main.append(sysCard);
+  cardUpdaters.push(() => {
+    const s = r.sys;
+    if (!s) { sysCard.replaceChildren(el('div', { class: 'muted', text: r.sysError ? 'System info unavailable: ' + r.sysError : 'Loading system information…' })); return; }
+    if (sysCard.dataset.at === String(r.sysAt)) return;
+    sysCard.dataset.at = String(r.sysAt);
+    const item = (k, v, extra) => el('div', { class: 'sysitem' }, el('div', { class: 'k', text: k }), el('div', { class: 'v', text: v, title: v }), extra || null);
+    const memUsed = s.totalMemoryKB ? 100 - s.freeMemoryKB / s.totalMemoryKB * 100 : null;
+    const meter = (pct, crit = 90, warn = 80) => el('div', { class: 'meter' + (pct >= crit ? ' critical' : pct >= warn ? ' warning' : '') }, el('i', { style: { width: clamp(pct, 0, 100) + '%' } }));
+    const items = [
+      item('Operating system', `${s.os} (${s.osBuild})`),
+      item('Processor', `${s.cpuName}`, el('div', { class: 'muted', style: { fontSize: '12px' }, text: `${s.sockets} socket(s) · ${s.cores} cores · ${s.logicalCpus} logical` })),
+      item('Memory', `${bytes(s.totalMemoryKB * 1024)} · ${isNum(memUsed) ? nf0.format(memUsed) + '% used' : ''}`, isNum(memUsed) ? meter(memUsed) : null),
+      item('Uptime', isNum(s.uptimeSec) ? duration(s.uptimeSec) : '—', el('div', { class: 'muted', style: { fontSize: '12px' }, text: s.manufacturer ? `${s.manufacturer} ${s.model}` : '' })),
+      ...(s.disks || []).map(d => { const used = d.size ? 100 - d.free / d.size * 100 : 0; return item(`Volume ${d.name}${d.label ? ' · ' + d.label : ''}`, `${bytes(d.free)} free of ${bytes(d.size)}`, meter(used, 95, 85)); }),
+    ];
+    sysCard.replaceChildren(el('div', { class: 'sysgrid' }, items));
+  });
+
+  if (!m.metrics.length) {
+    main.append(el('div', { class: 'empty-state' }, el('div', { class: 'ic', html: icon('chart') }), el('h2', { text: 'Pick some metrics' }),
+      el('p', { text: 'Choose metrics from the list on the left, or start from a preset.' }),
+      el('div', { style: { display: 'flex', gap: '8px', justifyContent: 'center', flexWrap: 'wrap' } }, Object.keys(PRESETS).map(p => el('button', { class: 'btn', text: p, onclick: () => { m.metrics = [...PRESETS[p]]; metricsChanged(m); } })))));
+    return;
+  }
+
+  // KPI tiles
+  main.append(el('div', { class: 'sec-title', text: 'Key indicators' }));
+  const tiles = el('div', { class: 'tiles' });
+  main.append(tiles);
+  for (const id of m.metrics) {
+    const def = metricDef(id); if (!def) continue;
+    const lbl = el('div', { class: 'lbl', title: def.path }), val = el('div', { class: 'val' }), delta = el('div', { class: 'delta' }), spark = el('div');
+    const tile = el('div', { class: 'card tile' }, el('i', { class: 'bar' }), lbl, val, el('div', { class: 'row' }, delta, spark));
+    tiles.append(tile);
+    cardUpdaters.push(() => {
+      const h = r.hist.get(id);
+      const pts = aggSeries(h, def);
+      const v = lastVal(pts);
+      const th = thresholdsFor(m, def);
+      const st = statusOf(v, th);
+      tile.className = 'card tile ' + (st === 'none' ? '' : st) + (h && h.error && !pts.length ? ' na' : '');
+      lbl.replaceChildren(el('span', { text: def.label, style: { overflow: 'hidden', textOverflow: 'ellipsis' } }), statusBadge(st, false));
+      if (h && h.error && !pts.length) { val.textContent = 'Not available'; delta.textContent = ''; spark.innerHTML = ''; tile.title = h.error; return; }
+      tile.title = '';
+      val.textContent = fmtVal(def.unit, v);
+      const { t0, t1 } = timeDomain();
+      const ref = valueAt(pts, t1 - 60000) ?? (pts.find(p => isNum(p[1])) || [0, null])[1];
+      if (isNum(v) && isNum(ref) && pts.length > 2) {
+        const dv = v - ref;
+        const rel = Math.abs(ref) > 1e-9 ? dv / Math.abs(ref) : 0;
+        const flat = Math.abs(rel) < 0.02 || Math.abs(dv) < 1e-9;
+        const up = dv > 0;
+        const bad = th.dir === 'below' ? !up : up;
+        delta.className = 'delta' + (flat || th.warn == null && th.crit == null ? '' : bad ? ' bad' : ' good');
+        delta.textContent = flat ? '→ steady vs 1 min ago' : `${up ? '▲' : '▼'} ${def.unit === 'pct' ? nf1.format(Math.abs(dv)) + ' pts' : nf0.format(Math.abs(rel * 100)) + '%'} vs 1 min ago`;
+      } else { delta.className = 'delta'; delta.textContent = pts.length ? 'collecting…' : 'waiting for data…'; }
+      spark.innerHTML = sparkSVG(pts, t0, t1, 'var(--s1)', 96, 30, def.max);
+    });
+  }
+
+  // chart cards
+  main.append(el('div', { class: 'sec-title', text: 'Trends' }));
+  const cards = el('div', { class: 'cards' });
+  main.append(cards);
+  for (const id of m.metrics) {
+    const def = metricDef(id); if (!def) continue;
+    cards.append(buildMetricCard(m, r, def));
+  }
+}
+
+function buildMetricCard(m, r, def) {
+  const layout = m.layout[def.id] || (m.layout[def.id] = { wide: false, table: false });
+  const card = el('article', { class: 'card' + (layout.wide ? ' wide' : ''), dataset: { metric: def.id } });
+  const chip = el('span', { class: 'chip', text: catLabel(def.cat) });
+  const btnTable = el('button', { class: 'btn sm ghost icon', title: layout.table ? 'Show chart' : 'Show table', 'aria-label': 'Toggle table view', html: icon(layout.table ? 'chart' : 'table') });
+  const btnMore = el('button', { class: 'btn sm ghost icon', title: 'Card options', 'aria-label': 'Card options', html: icon('more') });
+  const handle = el('span', { class: 'drag', title: 'Drag to reorder', html: icon('drag') });
+  const meta = el('div', { class: 'meta mono', text: def.path, title: def.path });
+  card.append(el('div', { class: 'card-head' }, handle, el('div', { class: 'ttl' }, el('h3', {}, def.label, chip), meta), el('div', { class: 'acts' }, btnTable, btnMore)));
+  const kpi = el('div', { class: 'card-kpi' });
+  const body = el('div');
+  const legend = el('div', { class: 'legend' });
+  card.append(kpi, body, legend);
+
+  const chartHost = el('div');
+  const chart = new LineChart(chartHost);
+  const errBox = el('div', { class: 'card-error' });
+  const tableWrap = el('div', { class: 'table-wrap' });
+
+  btnTable.addEventListener('click', () => { layout.table = !layout.table; btnTable.innerHTML = icon(layout.table ? 'chart' : 'table'); btnTable.title = layout.table ? 'Show chart' : 'Show table'; markDirty(); update(); });
+  btnMore.addEventListener('click', () => cardMenu(m, def, btnMore));
+
+  // drag & drop reordering
+  handle.addEventListener('pointerdown', () => { card.draggable = true; });
+  card.addEventListener('dragstart', e => { card.classList.add('dragging'); e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/x-mm-metric', def.id); });
+  card.addEventListener('dragend', () => { card.draggable = false; card.classList.remove('dragging'); document.querySelectorAll('.drop-before').forEach(n => n.classList.remove('drop-before')); });
+  card.addEventListener('dragover', e => { if (e.dataTransfer.types.includes('text/x-mm-metric')) { e.preventDefault(); card.classList.add('drop-before'); } });
+  card.addEventListener('dragleave', () => card.classList.remove('drop-before'));
+  card.addEventListener('drop', e => {
+    const from = e.dataTransfer.getData('text/x-mm-metric');
+    if (!from) return;
+    e.preventDefault(); e.stopPropagation();
+    card.classList.remove('drop-before');
+    if (from === def.id) return;
+    const list = m.metrics.filter(x => x !== from);
+    list.splice(list.indexOf(def.id), 0, from);
+    m.metrics = list; markDirty(); renderMain();
+  });
+
+  let lastMode = '';
+  function update() {
+    const h = r.hist.get(def.id);
+    const { t0, t1 } = timeDomain();
+    const th = thresholdsFor(m, def);
+    const agg = aggSeries(h, def);
+    const v = lastVal(agg);
+    const st = statusOf(v, th);
+    chip.className = 'chip' + (h && h.source === 'cim' ? ' cim' : '');
+    chip.textContent = catLabel(def.cat) + (h && h.source === 'cim' ? ' · via CIM' : '');
+    chip.title = h && h.source === 'cim' ? 'Performance counters were unavailable, so this value comes from a WMI/CIM fallback.' : '';
+
+    if (h && h.error && !agg.length) {
+      kpi.replaceChildren(); legend.replaceChildren();
+      errBox.innerHTML = icon('info');
+      errBox.append(el('div', {}, el('b', { text: 'Not available on this machine. ' }), h.error,
+        el('div', { class: 'muted', style: { marginTop: '4px' }, text: def.cat === 'web' || def.cat === 'asp' ? 'IIS / ASP.NET counters exist only where the Web Server role is installed.' : def.cat === 'sql' ? 'SQL counters exist only where SQL Server runs. Named instances use MSSQL$NAME: - add them as custom counters.' : '' })));
+      if (lastMode !== 'err') { body.replaceChildren(errBox); lastMode = 'err'; }
+      return;
+    }
+
+    // headline value + gauge
+    const kids = [];
+    if (def.gauge && !def.multi) kids.push(el('div', { html: gaugeSVG(v, def.max, st) }));
+    kids.push(el('div', { class: 'kv' }, el('div', { class: 'big', text: fmtVal(def.unit, v) }),
+      el('div', { class: 'muted', style: { fontSize: '12px' }, text: def.multi ? `${{ sum: 'Total', avg: 'Average', max: 'Highest', min: 'Lowest' }[def.agg || 'sum']} of ${h ? h.series.size : 0} instance(s)` : (def.desc || '') }),
+      statusBadge(st)));
+    kpi.replaceChildren(...kids);
+
+    // series selection: stable colours per instance, capped at 8
+    let series = [];
+    let hidden = 0;
+    if (h) {
+      let entries = [...h.series.values()];
+      const latest = s => lastVal(s.pts) ?? -Infinity;
+      if (def.multi) {
+        entries.sort((a, b) => latest(b) - latest(a));
+        const cap = Math.min(def.top || SERIES_SLOTS, SERIES_SLOTS);
+        hidden = Math.max(0, entries.length - cap);
+        entries = entries.slice(0, cap);
+        // colour follows the instance: keep its previous slot when still free, else take the lowest free slot
+        const used = new Set(), need = [];
+        for (const s of entries) {
+          const sl = r.slots.get(def.id + '|' + s.key);
+          if (sl !== undefined && !used.has(sl)) used.add(sl); else need.push(s);
+        }
+        for (const s of need) {
+          let sl = 0; while (used.has(sl)) sl++;
+          r.slots.set(def.id + '|' + s.key, sl); used.add(sl);
+        }
+        entries.sort((a, b) => r.slots.get(def.id + '|' + a.key) - r.slots.get(def.id + '|' + b.key));
+      }
+      series = entries.map(s => ({ key: s.key, label: def.multi ? s.key : def.label, color: def.multi ? seriesColor(r.slots.get(def.id + '|' + s.key)) : seriesColor(0), pts: s.pts }));
+    }
+    const thresholds = [];
+    if (isNum(th.warn)) thresholds.push({ v: th.warn, level: 'warning' });
+    if (isNum(th.crit)) thresholds.push({ v: th.crit, level: 'critical' });
+
+    if (layout.table) {
+      if (lastMode !== 'table') { body.replaceChildren(tableWrap); lastMode = 'table'; }
+      const times = h ? h.t.filter(t => t >= t0).slice(-60).reverse() : [];
+      const table = el('table', { class: 'data' }, el('thead', {}, el('tr', {}, el('th', { text: 'Time' }), series.map(s => el('th', { text: s.label })))),
+        el('tbody', {}, times.map(t => el('tr', {}, el('td', { text: fmtClock(t) }), series.map(s => { const p = s.pts.find(q => q[0] === t); return el('td', { text: fmtVal(def.unit, p ? p[1] : null) }); })))));
+      tableWrap.replaceChildren(table);
+      if (!times.length) tableWrap.append(el('div', { class: 'muted', style: { padding: '12px' }, text: 'Waiting for data…' }));
+    } else {
+      if (lastMode !== 'chart') { body.replaceChildren(chartHost); lastMode = 'chart'; }
+      chart.update({ series, t0, t1, unit: def.unit, max: def.max, thresholds, fill: true, label: def.label });
+      if (!series.some(s => s.pts.length) && !chartHost.querySelector('.empty')) chartHost.append(el('div', { class: 'empty', text: r.status === 'error' ? r.error : 'Waiting for the first sample…' }));
+      if (series.some(s => s.pts.length)) { const e = chartHost.querySelector('.empty'); if (e) e.remove(); }
+    }
+    if (series.length > 1 || hidden) {
+      legend.replaceChildren(...series.map(s => el('span', { class: 'k', title: s.label }, el('i', { class: 'ln', style: { background: s.color } }), el('span', { text: `${s.label} · ${fmtVal(def.unit, lastVal(s.pts))}` }))),
+        ...(hidden ? [el('span', { class: 'more', text: def.top ? `top ${series.length} of ${series.length + hidden}` : `+${hidden} more instance(s) not drawn (showing the ${series.length} highest)` })] : []));
+    } else legend.replaceChildren();
+  }
+  cardUpdaters.push(update);
+  return card;
+}
+
+/* ------------------------------------------------------------------ menus */
+let openMenuEl = null;
+function closeMenu() { if (openMenuEl) { openMenuEl.remove(); openMenuEl = null; } }
+function showMenu(anchor, items) {
+  closeMenu();
+  const menu = el('div', { class: 'menu', role: 'menu' });
+  for (const it of items) {
+    if (it === '-') { menu.append(el('hr')); continue; }
+    menu.append(el('button', { role: 'menuitem', class: it.danger ? 'danger' : '', html: icon(it.icon || 'chevron'), onclick: () => { closeMenu(); it.run(); } }, it.label));
+  }
+  document.body.append(menu);
+  const b = anchor.getBoundingClientRect();
+  const w = menu.offsetWidth, h = menu.offsetHeight;
+  menu.style.left = clamp(b.right - w, 8, innerWidth - w - 8) + 'px';
+  menu.style.top = (b.bottom + 6 + h > innerHeight ? Math.max(8, b.top - h - 6) : b.bottom + 6) + 'px';
+  openMenuEl = menu;
+  menu.querySelector('button')?.focus();
+  menu.addEventListener('keydown', e => {
+    const bs = [...menu.querySelectorAll('button')]; const i = bs.indexOf(document.activeElement);
+    if (e.key === 'ArrowDown') { e.preventDefault(); bs[(i + 1) % bs.length].focus(); }
+    if (e.key === 'ArrowUp') { e.preventDefault(); bs[(i - 1 + bs.length) % bs.length].focus(); }
+    if (e.key === 'Escape') { closeMenu(); anchor.focus(); }
+  });
+}
+document.addEventListener('pointerdown', e => { if (openMenuEl && !openMenuEl.contains(e.target)) closeMenu(); });
+function cardMenu(m, def, anchor) {
+  const layout = m.layout[def.id] || (m.layout[def.id] = { wide: false, table: false });
+  const i = m.metrics.indexOf(def.id);
+  showMenu(anchor, [
+    { label: layout.wide ? 'Normal width' : 'Full width', icon: 'wide', run: () => { layout.wide = !layout.wide; markDirty(); renderMain(); } },
+    { label: 'Thresholds…', icon: 'warn', run: () => thresholdDialog(m, def) },
+    { label: 'Move earlier', icon: 'chevron', run: () => { if (i > 0) { m.metrics.splice(i - 1, 0, m.metrics.splice(i, 1)[0]); markDirty(); renderMain(); } } },
+    { label: 'Move later', icon: 'chevron', run: () => { if (i < m.metrics.length - 1) { m.metrics.splice(i + 1, 0, m.metrics.splice(i, 1)[0]); markDirty(); renderMain(); } } },
+    { label: 'Copy counter path', icon: 'file', run: () => copyText(def.path) },
+    '-',
+    { label: 'Remove from dashboard', icon: 'trash', danger: true, run: () => { m.metrics = m.metrics.filter(x => x !== def.id); metricsChanged(m); } },
+  ]);
+}
+function machineMenu(m, anchor) {
+  showMenu(anchor, [
+    { label: 'Edit machine…', icon: 'edit', run: () => machineDialog(m) },
+    { label: 'Duplicate', icon: 'plus', run: () => { const c = JSON.parse(JSON.stringify(m)); c.id = uid('m'); c.name = m.name + ' (copy)'; c.colorSlot = freeColorSlot(); config.machines.push(c); markDirty(); setView(c.id); } },
+    { label: 'Refresh system info', icon: 'refresh', run: () => { const r = runtime(m); refreshSys(m, r, true).then(scheduleRender); } },
+    '-',
+    { label: 'Remove machine', icon: 'trash', danger: true, run: async () => {
+      if (!await confirmDialog(`Remove “${m.name}” from this dashboard?`, 'Remove')) return;
+      config.machines = config.machines.filter(x => x !== m); rt.delete(m.id); markDirty(); setView('overview');
+    } },
+  ]);
+}
+async function copyText(t) { try { await navigator.clipboard.writeText(t); toast('Copied to clipboard.', 'ok'); } catch { toast('Clipboard not available.', 'err'); } }
+
+/* ------------------------------------------------------------------ dialogs */
+const dlg = $('#dlg');
+function openDialog({ title, body, foot, wide = false, onClose }) {
+  if (dlg.open) dlg.close();
+  dlg.className = wide ? 'wide' : '';
+  const close = el('button', { class: 'btn ghost icon', 'aria-label': 'Close', html: icon('x'), onclick: () => dlg.close() });
+  dlg.replaceChildren(el('div', { class: 'dlg' }, el('div', { class: 'dlg-head' }, el('h2', { text: title }), close), el('div', { class: 'dlg-body' }, body), foot ? el('div', { class: 'dlg-foot' }, foot) : null));
+  dlg.onclose = () => { if (onClose) onClose(); };
+  dlg.showModal();
+  const f = dlg.querySelector('.dlg-body input:not([type=hidden]), .dlg-body select, .dlg-body textarea');
+  if (f) f.focus();
+}
+dlg.addEventListener('click', e => { if (e.target === dlg) dlg.close(); });
+function field(label, input, hint) {
+  const isControl = /^(INPUT|SELECT|TEXTAREA)$/.test(input.tagName);
+  if (isControl && !input.id) input.id = uid('f');
+  const lbl = isControl ? el('label', { for: input.id }, label) : el('label', { id: uid('f') }, label);
+  if (!isControl) input.setAttribute('aria-labelledby', lbl.id);
+  return el('div', { class: 'field' }, lbl, input, hint ? el('div', { class: 'hint' }, hint) : null);
+}
+function confirmDialog(text, okLabel = 'OK') {
+  return new Promise(res => {
+    let result = false;
+    openDialog({ title: 'Please confirm', body: el('p', { text }), onClose: () => res(result),
+      foot: [el('button', { class: 'btn', text: 'Cancel', onclick: () => dlg.close() }), el('button', { class: 'btn primary', text: okLabel, onclick: () => { result = true; dlg.close(); } })] });
+  });
+}
+
+function machineDialog(m) {
+  const isNew = !m;
+  const name = el('input', { class: 'inp', value: m ? m.name : '', placeholder: 'e.g. Web server 01', maxlength: 80 });
+  const host = el('input', { class: 'inp mono', value: m ? m.host : '', placeholder: 'localhost, SERVER01 or server01.corp.local', maxlength: 255, spellcheck: 'false' });
+  const agentUrl = el('input', { class: 'inp mono', value: m ? m.agentUrl : '', placeholder: 'http://server01:8765 (optional)', spellcheck: 'false' });
+  const apiKey = el('input', { class: 'inp mono', type: 'password', value: m ? m.apiKey : '', placeholder: 'X-MM-Key of that agent', autocomplete: 'off' });
+  const preset = el('select', { class: 'sel' }, el('option', { value: '', text: 'Choose later' }), Object.keys(PRESETS).map(p => el('option', { value: p, text: p, selected: p === 'Essentials' || undefined })));
+  const result = el('div', { class: 'test-result' });
+  const adv = el('details', { class: 'adv', open: m && m.agentUrl ? true : undefined }, el('summary', { text: 'Advanced: read through another agent' }),
+    field('Agent URL', agentUrl, 'Leave empty to read the machine through the agent this page is connected to (needs Remote Registry + Performance Monitor Users on the target). Set it to talk to an agent running on or near the target instead - start that agent with -AllowRemote -ApiKey.'),
+    field('API key', apiKey, 'Stored in the config file in plain text. Treat saved configs that contain keys as secrets.'));
+  const test = async () => {
+    result.className = 'test-result'; result.textContent = 'Testing…';
+    const probe = { ...(m || {}), host: host.value.trim() || 'localhost', agentUrl: agentUrl.value.trim(), apiKey: apiKey.value };
+    if (state.mode === 'demo' && !probe.agentUrl) { result.className = 'test-result ok'; result.textContent = '✓ Demo mode - simulated data will be shown.'; return; }
+    try {
+      const s = await api(probe, '/api/sysinfo?computer=' + encodeURIComponent(probe.host), { timeout: 25000 });
+      if (!s.ok) throw new Error(s.error);
+      result.className = 'test-result ok';
+      result.textContent = `✓ Connected to ${s.computer} - ${s.os}, ${s.logicalCpus} logical CPUs, ${bytes(s.totalMemoryKB * 1024)} RAM.`;
+      if (!name.value.trim()) name.value = s.computer;
+    } catch (e) { result.className = 'test-result bad'; result.textContent = '✗ ' + e.message; }
+  };
+  const save = () => {
+    const h = host.value.trim() || 'localhost';
+    if (!/^[A-Za-z0-9][A-Za-z0-9._:\-]{0,253}$/.test(h)) { result.className = 'test-result bad'; result.textContent = '✗ Host must be a computer name, FQDN or IP address.'; host.focus(); return; }
+    const au = agentUrl.value.trim();
+    if (au && !/^https?:\/\/[^\s/]+/i.test(au)) { result.className = 'test-result bad'; result.textContent = '✗ Agent URL must start with http:// or https://'; agentUrl.focus(); return; }
+    if (isNew) {
+      const nm = newMachine({ name: name.value.trim() || h, host: h, agentUrl: au, apiKey: apiKey.value, colorSlot: freeColorSlot(), metrics: preset.value ? PRESETS[preset.value] : [] });
+      config.machines.push(nm);
+      dlg.close(); markDirty(); setView(nm.id); pollMachine(nm);
+    } else {
+      const changed = m.host !== h || m.agentUrl !== au || m.apiKey !== apiKey.value;
+      m.name = name.value.trim() || h; m.host = h; m.agentUrl = au; m.apiKey = apiKey.value;
+      if (changed) { rt.delete(m.id); }
+      dlg.close(); markDirty(); renderSidebar(); renderMain(); if (changed) pollMachine(m);
+    }
+    checkHub();
+  };
+  const body = el('form', { onsubmit: e => { e.preventDefault(); save(); } },
+    el('div', { class: 'frow' }, field('Display name', name), field('Computer', host, 'Name, FQDN or IP the agent can reach.')),
+    isNew ? field('Start with metrics', preset) : null, adv, result, el('button', { type: 'submit', hidden: true }));
+  openDialog({ title: isNew ? 'Add machine' : `Edit ${m.name}`, body,
+    foot: [el('div', { class: 'left' }, el('button', { class: 'btn', html: icon('pulse') + 'Test connection', onclick: test })),
+      el('button', { class: 'btn', text: 'Cancel', onclick: () => dlg.close() }), el('button', { class: 'btn primary', text: isNew ? 'Add machine' : 'Save', onclick: save })] });
+}
+
+function thresholdDialog(m, def) {
+  const th = thresholdsFor(m, def);
+  const unitHint = def.unit === 'mb' ? 'MB' : def.unit === 'pct' ? '%' : def.unit === 'ms' ? 'ms' : UNITS[def.unit].name.toLowerCase();
+  const warn = el('input', { class: 'inp', type: 'number', step: 'any', value: th.warn ?? '' });
+  const crit = el('input', { class: 'inp', type: 'number', step: 'any', value: th.crit ?? '' });
+  openDialog({ title: `Thresholds · ${def.label}`,
+    body: el('div', {}, el('p', { class: 'muted', text: `${th.dir === 'below' ? 'Low' : 'High'} values are bad for this metric. Values in ${unitHint}. Leave a box empty to turn that level off. Applies to ${m.name} only.` }),
+      el('div', { class: 'frow' }, field('Warning at', warn), field('Critical at', crit))),
+    foot: [el('div', { class: 'left' }, el('button', { class: 'btn ghost', text: 'Reset to defaults', onclick: () => { delete m.thresholds[def.id]; markDirty(); dlg.close(); updateView(); } })),
+      el('button', { class: 'btn', text: 'Cancel', onclick: () => dlg.close() }),
+      el('button', { class: 'btn primary', text: 'Save', onclick: () => {
+        const p = s => s.value.trim() === '' ? null : Number(s.value);
+        m.thresholds[def.id] = { warn: p(warn), crit: p(crit) };
+        markDirty(); dlg.close(); renderMain();
+      } })] });
+}
+
+function customDialog(m, preset = {}) {
+  const path = el('input', { class: 'inp mono', value: preset.path || '', placeholder: '\\Web Service(Default Web Site)\\Current Connections', spellcheck: 'false' });
+  const label = el('input', { class: 'inp', value: preset.label || '', placeholder: 'Friendly name' });
+  const unit = el('select', { class: 'sel' }, Object.entries(UNITS).map(([k, u]) => el('option', { value: k, text: u.name, selected: k === (preset.unit || 'count') || undefined })));
+  const dir = el('select', { class: 'sel' }, el('option', { value: 'above', text: 'High values are bad' }), el('option', { value: 'below', text: 'Low values are bad' }));
+  const warn = el('input', { class: 'inp', type: 'number', step: 'any' }), crit = el('input', { class: 'inp', type: 'number', step: 'any' });
+  const msg = el('div', { class: 'test-result' });
+  const guessUnit = () => {
+    const p = path.value.toLowerCase();
+    if (preset.unit) return;
+    unit.value = p.includes('%') ? 'pct' : /bytes\/sec/.test(p) ? 'bps' : /bytes/.test(p) ? 'bytes' : /megabytes|mbytes/.test(p) ? 'mb' : /\/ ?sec/.test(p) ? 'persec' : 'count';
+    if (!label.value.trim() || label.dataset.auto) { label.value = (path.value.split('\\').pop() || '').trim(); label.dataset.auto = '1'; }
+  };
+  path.addEventListener('input', guessUnit);
+  label.addEventListener('input', () => { delete label.dataset.auto; });
+  const add = () => {
+    const p = path.value.trim();
+    if (!/^\\[^\\]+\\[^\\]+$/.test(p) && !/^\\[^\\]+\([^)]*\)\\[^\\]+$/.test(p)) { msg.className = 'test-result bad'; msg.textContent = '✗ Use the form \\Set\\Counter or \\Set(Instance)\\Counter. Instance may be * for all.'; return; }
+    let id = 'custom.' + hashStr(p.toLowerCase()).toString(36);
+    const n = v => v.value.trim() === '' ? undefined : Number(v.value);
+    const def = { id, cat: 'custom', label: label.value.trim() || p, path: p, unit: unit.value, multi: p.includes('*'), exclude: p.includes('*') ? ['_total', '__total__', '_global_'] : undefined,
+                  agg: unit.value === 'pct' ? 'avg' : 'sum', dir: dir.value, max: unit.value === 'pct' ? 100 : undefined, warn: n(warn), crit: n(crit), desc: 'Custom counter' };
+    const existing = config.customMetrics.findIndex(c => c.id === id);
+    if (existing >= 0) config.customMetrics[existing] = def; else config.customMetrics.push(def);
+    if (!m.metrics.includes(id)) m.metrics.push(id);
+    dlg.close(); toast(`Added “${def.label}”.`, 'ok'); metricsChanged(m);
+  };
+  openDialog({ title: 'Add a performance counter',
+    body: el('form', { onsubmit: e => { e.preventDefault(); add(); } }, field('Counter path', path, 'Any counter from Performance Monitor. Use (*) to chart every instance, e.g. \\Process(*)\\Handle Count.'),
+      el('div', { class: 'frow' }, field('Label', label), field('Unit', unit)),
+      el('div', { class: 'frow' }, field('Warning at', warn), field('Critical at', crit)), field('Direction', dir), msg, el('button', { type: 'submit', hidden: true })),
+    foot: [el('div', { class: 'left' }, el('button', { class: 'btn', html: icon('list') + 'Browse counters…', onclick: () => browserDialog(m) })),
+      el('button', { class: 'btn', text: 'Cancel', onclick: () => dlg.close() }), el('button', { class: 'btn primary', text: 'Add to ' + m.name, onclick: add })] });
+  if (preset.path) guessUnit();
+}
+
+async function browserDialog(m) {
+  const search = el('input', { class: 'inp', type: 'search', placeholder: 'Filter sets and counters…  e.g. "web service", "queue", "sql"' });
+  const list = el('div', { class: 'set-list' }, el('div', { class: 'muted', style: { padding: '16px' }, text: 'Loading counter sets from ' + m.host + '…' }));
+  const inst = el('input', { class: 'inp mono', value: '*', style: { width: '130px' }, title: 'Instance to use for multi-instance sets' });
+  openDialog({ title: `Counters on ${m.name}`, wide: true,
+    body: el('div', {}, el('div', { style: { display: 'flex', gap: '10px', marginBottom: '12px', flexWrap: 'wrap', alignItems: 'center' } }, el('div', { style: { flex: '1', minWidth: '220px' } }, search), el('label', { class: 'muted', style: { fontSize: '13px' } }, 'Instance ', inst)), list),
+    foot: [el('div', { class: 'left muted', style: { fontSize: '12px' }, text: 'Click “Add” to put a counter on the dashboard. Multi-instance sets use the instance box ( * = all, _Total = total ).' }), el('button', { class: 'btn', text: 'Close', onclick: () => dlg.close() })] });
+  let sets;
+  try {
+    if (state.mode === 'demo' && !m.agentUrl) {
+      sets = [...new Map(CATALOG.map(d => [d.path.match(/^\\([^\\(]+)/)[1], d])).keys()].map(name => ({ name, description: 'Demo counter set', multi: CATALOG.some(d => d.path.startsWith('\\' + name + '(')), paths: CATALOG.filter(d => d.path.match(/^\\([^\\(]+)/)[1] === name).map(d => d.path.replace(/\(([^)]*)\)/, '(*)')) }));
+    } else {
+      const res = await api(m, '/api/sets?computer=' + encodeURIComponent(m.host || 'localhost'), { timeout: 60000 });
+      if (!res.ok) throw new Error(res.error);
+      sets = res.sets;
+    }
+  } catch (e) { list.replaceChildren(el('div', { class: 'test-result bad', style: { padding: '16px' }, text: '✗ ' + e.message })); return; }
+  const render = () => {
+    const q = search.value.trim().toLowerCase();
+    const frag = [];
+    let shown = 0;
+    for (const s of sets) {
+      const setHit = !q || s.name.toLowerCase().includes(q) || (s.description || '').toLowerCase().includes(q);
+      const paths = (s.paths || []).filter(p => setHit || p.toLowerCase().includes(q));
+      if (!paths.length) continue;
+      if (++shown > 120) break;
+      const det = el('details', { open: q && paths.length < 25 ? true : undefined }, el('summary', {}, s.name, s.multi ? el('span', { class: 'chip', text: 'multi-instance' }) : null, el('span', { class: 'd', text: s.description || '' })));
+      det.addEventListener('toggle', () => {
+        if (!det.open || det.dataset.built) return;
+        det.dataset.built = '1';
+        for (const p of paths) {
+          det.append(el('div', { class: 'p' }, el('span', { class: 'mono', text: p, title: p }),
+            el('button', { class: 'btn sm', text: 'Add', onclick: () => {
+              const finalPath = s.multi ? p.replace('(*)', '(' + (inst.value.trim() || '*') + ')') : p;
+              customDialog(m, { path: finalPath, label: `${s.name}: ${p.split('\\').pop()}` });
+            } })));
+        }
+      });
+      if (det.open) det.dispatchEvent(new Event('toggle'));
+      frag.push(det);
+    }
+    list.replaceChildren(...frag);
+    if (!frag.length) list.append(el('div', { class: 'muted', style: { padding: '16px' }, text: 'No counters match.' }));
+    if (shown > 120) list.append(el('div', { class: 'muted', style: { padding: '12px 16px' }, text: 'Showing the first 120 sets - refine the filter to see more.' }));
+  };
+  search.addEventListener('input', debounce(render, 150));
+  render();
+}
+
+function settingsDialog() {
+  const s = config.settings;
+  let mode = s.mode;
+  const seg = el('div', { class: 'seg', role: 'radiogroup' });
+  const modes = [['auto', 'Automatic'], ['live', 'Live agent'], ['demo', 'Demo data']];
+  const drawSeg = () => seg.replaceChildren(...modes.map(([k, l]) => el('button', { type: 'button', role: 'radio', 'aria-checked': String(mode === k), class: mode === k ? 'on' : '', text: l, onclick: () => { mode = k; drawSeg(); } })));
+  drawSeg();
+  const hub = el('input', { class: 'inp mono', value: s.hubUrl, placeholder: /^https?:$/.test(location.protocol) ? location.origin + ' (this page)' : 'http://localhost:8765', spellcheck: 'false' });
+  const key = el('input', { class: 'inp mono', type: 'password', value: s.hubKey, autocomplete: 'off' });
+  const refresh = el('select', { class: 'sel' }, REFRESHES.map(v => el('option', { value: v, text: `Every ${v} seconds`, selected: v === s.refreshSec || undefined })));
+  const win = el('select', { class: 'sel' }, WINDOWS.map(v => el('option', { value: v, text: v === 60 ? 'Last hour' : `Last ${v} minute${v > 1 ? 's' : ''}`, selected: v === s.windowMin || undefined })));
+  const theme = el('select', { class: 'sel' }, [['auto', 'Match system'], ['light', 'Light'], ['dark', 'Dark']].map(([k, l]) => el('option', { value: k, text: l, selected: k === s.theme || undefined })));
+  const info = el('div', { class: 'muted', style: { fontSize: '13px' } });
+  info.textContent = state.hubOk ? `Connected: agent ${state.hubInfo.version} on ${state.hubInfo.computer} as ${state.hubInfo.user}.` : `Not connected: ${state.hubError || 'no agent found'}.`;
+  openDialog({ title: 'Settings',
+    body: el('div', {}, field('Data source', seg, 'Automatic uses the agent when it answers and simulated data otherwise.'),
+      field('Agent URL', hub, 'Where MultiMonitor.ps1 is listening. Leave empty when this page is served by the agent.'),
+      field('Agent API key', key, 'Only needed when the agent was started with -ApiKey.'),
+      el('div', { class: 'frow' }, field('Refresh', refresh), field('Time window', win)), field('Theme', theme), info),
+    foot: [el('div', { class: 'left' }, el('button', { class: 'btn ghost', text: 'Clear chart history', onclick: () => { clearHistory(); dlg.close(); renderMain(); tick(); } })),
+      el('button', { class: 'btn', text: 'Cancel', onclick: () => dlg.close() }),
+      el('button', { class: 'btn primary', text: 'Save', onclick: () => {
+        const hv = hub.value.trim();
+        if (hv && !/^https?:\/\/[^\s/]+/i.test(hv)) { info.className = 'test-result bad'; info.textContent = '✗ Agent URL must start with http:// or https://'; return; }
+        const reconnect = s.hubUrl !== hv || s.hubKey !== key.value || s.mode !== mode;
+        Object.assign(s, { mode, hubUrl: hv, hubKey: key.value, refreshSec: +refresh.value, windowMin: +win.value, theme: theme.value });
+        dlg.close(); markDirty(); applyTheme(); renderTopbar(); restartPolling(); renderMain();
+        if (reconnect) checkHub();
+      } })] });
+}
+
+function helpDialog() {
+  const p = (...k) => el('p', {}, ...k);
+  openDialog({ title: 'How MultiMonitor works', wide: true, body: el('div', {},
+    p(el('b', { text: 'The agent. ' }), 'Browsers cannot read Windows performance counters, so MultiMonitor.ps1 (Windows PowerShell 5.1, no installs) serves this page and reads counters for it. Run it with ', el('span', { class: 'mono', text: 'powershell -ExecutionPolicy Bypass -File .\\MultiMonitor.ps1' }), ' then browse to http://localhost:8765.'),
+    p(el('b', { text: 'Remote machines. ' }), 'The agent reads other computers with Get-Counter -ComputerName, as the account running it. That account must be in the target’s “Performance Monitor Users” group, and the Remote Registry service must be running there. Alternatively, run another agent on the target with -AllowRemote -ApiKey and set the machine’s Agent URL.'),
+    p(el('b', { text: 'Configs. ' }), 'Save writes a .json file you can reopen later (or drag onto the page). “Save to agent” keeps it in the agent’s configs folder. Your last layout is also kept in this browser automatically.'),
+    p(el('b', { text: 'Shortcuts. ' }), 'Ctrl+O open · Ctrl+S save · Ctrl+Shift+S save as · Space pause (when nothing is focused) · arrow keys inside a chart step through samples.'),
+    p(el('b', { text: 'Fallback. ' }), 'If a machine’s counter registry is damaged, core metrics (CPU, memory, disk space, processes, uptime, TCP) are read via WMI/CIM instead and marked “via CIM”. Rebuild counters with ', el('span', { class: 'mono', text: 'lodctr /R' }), ' (elevated).')) });
+}
+
+/* ------------------------------------------------------------------ config I/O */
+function loadConfigObject(obj, fileName = '', handle = null) {
+  const c = normalizeConfig(obj);
+  config = c;
+  state.view = c.view;
+  state.fileName = fileName; state.fileHandle = handle; state.dirty = false;
+  rt.clear(); demoState.clear();
+  applyTheme(); renderTopbar(); renderSidebar(); renderMain();
+  restartPolling(); checkHub();
+  autosave();
+}
+function loadConfigText(text, fileName, handle) {
+  let obj;
+  try { obj = JSON.parse(text); } catch (e) { throw new Error('The file is not valid JSON: ' + e.message); }
+  loadConfigObject(obj, fileName, handle);
+  toast(`Opened “${config.name}”${fileName ? ' from ' + fileName : ''}.`, 'ok');
+}
+async function guardUnsaved() { return !state.dirty || await confirmDialog('You have unsaved changes. Discard them?', 'Discard changes'); }
+async function openConfigFile() {
+  if (!await guardUnsaved()) return;
+  if (window.showOpenFilePicker) {
+    try {
+      const [h] = await window.showOpenFilePicker({ types: [{ description: 'MultiMonitor config', accept: { 'application/json': ['.json'] } }] });
+      const f = await h.getFile();
+      loadConfigText(await f.text(), f.name, h);
+      return;
+    } catch (e) {
+      if (e.name === 'AbortError') return;
+      if (e.name !== 'SecurityError' && e.name !== 'TypeError') { toast(e.message, 'err'); return; }
+    }
+  }
+  $('#fileInput').click();
+}
+$('#fileInput').addEventListener('change', async e => {
+  const f = e.target.files[0]; e.target.value = '';
+  if (!f) return;
+  try { loadConfigText(await f.text(), f.name, null); } catch (err) { toast(err.message, 'err'); }
+});
+async function saveConfig(saveAs = false) {
+  const text = serializeConfig();
+  if (!saveAs && state.fileHandle && state.fileHandle.createWritable) {
+    try {
+      const w = await state.fileHandle.createWritable(); await w.write(text); await w.close();
+      savedOk(state.fileHandle.name); return;
+    } catch (e) { if (e.name === 'AbortError') return; toast('Could not write the file: ' + e.message + ' - choose a location instead.', 'err'); }
+  }
+  const suggested = (state.fileName && !saveAs ? state.fileName : slug(config.name) + '.mmconfig.json');
+  if (window.showSaveFilePicker) {
+    try {
+      const h = await window.showSaveFilePicker({ suggestedName: suggested, types: [{ description: 'MultiMonitor config', accept: { 'application/json': ['.json'] } }] });
+      const w = await h.createWritable(); await w.write(text); await w.close();
+      state.fileHandle = h; state.fileName = h.name; savedOk(h.name); return;
+    } catch (e) { if (e.name === 'AbortError') return; }
+  }
+  const a = el('a', { href: URL.createObjectURL(new Blob([text], { type: 'application/json' })), download: suggested });
+  document.body.append(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+  state.fileName = suggested; savedOk(suggested + ' (downloaded)');
+}
+function savedOk(name) { state.dirty = false; $('#dirtyDot').classList.remove('on'); autosave(); toast(`Saved ${name}.`, 'ok'); }
+async function saveToAgent() {
+  if (!state.hubOk) { toast('No agent connected - start MultiMonitor.ps1 or use “Save”.', 'err'); return; }
+  const name = el('input', { class: 'inp', value: slug(config.name), maxlength: 80 });
+  const msg = el('div', { class: 'test-result' });
+  const go = async () => {
+    const n = name.value.trim();
+    if (!/^[A-Za-z0-9][A-Za-z0-9 _.-]{0,79}$/.test(n) || n.includes('..')) { msg.className = 'test-result bad'; msg.textContent = '✗ Letters, digits, spaces, dot, dash and underscore only.'; return; }
+    try {
+      await api(null, '/api/configs/' + encodeURIComponent(n), { method: 'PUT', body: serializeConfig() });
+      dlg.close(); state.dirty = false; $('#dirtyDot').classList.remove('on'); autosave(); toast(`Saved to agent as “${n}”.`, 'ok');
+    } catch (e) { msg.className = 'test-result bad'; msg.textContent = '✗ ' + e.message; }
+  };
+  openDialog({ title: 'Save to agent', body: el('form', { onsubmit: e => { e.preventDefault(); go(); } }, field('Name', name, `Stored as configs\\<name>.json next to MultiMonitor.ps1 on ${state.hubInfo.computer}. An existing config with the same name is replaced.`), msg),
+    foot: [el('button', { class: 'btn', text: 'Cancel', onclick: () => dlg.close() }), el('button', { class: 'btn primary', text: 'Save', onclick: go })] });
+}
+async function openFromAgent() {
+  if (!state.hubOk) { toast('No agent connected.', 'err'); return; }
+  if (!await guardUnsaved()) return;
+  const list = el('div', { class: 'cfg-list', text: 'Loading…' });
+  openDialog({ title: 'Open from agent', body: list, foot: [el('button', { class: 'btn', text: 'Close', onclick: () => dlg.close() })] });
+  try {
+    const res = await api(null, '/api/configs');
+    if (!res.configs.length) { list.textContent = 'No configs saved on the agent yet.'; return; }
+    list.replaceChildren(...res.configs.map(c => el('button', { onclick: async () => {
+      try { const obj = await api(null, '/api/configs/' + encodeURIComponent(c.name)); dlg.close(); loadConfigObject(obj, c.name + '.json'); toast(`Opened “${config.name}” from the agent.`, 'ok'); }
+      catch (e) { toast(e.message, 'err'); }
+    } }, el('span', {}, el('b', { text: c.name })), el('span', { class: 'muted', text: new Date(c.modified).toLocaleString() }))));
+  } catch (e) { list.textContent = e.message; }
+}
+async function newConfig() {
+  if (!await guardUnsaved()) return;
+  loadConfigObject(defaultConfig());
+  toast('Started a new dashboard.', 'info');
+}
+function fileMenu(anchor) {
+  showMenu(anchor, [
+    { label: 'New dashboard', icon: 'newfile', run: newConfig },
+    { label: 'Open file…', icon: 'open', run: openConfigFile },
+    { label: 'Save as…', icon: 'save', run: () => saveConfig(true) },
+    '-',
+    { label: 'Open from agent…', icon: 'cloudDown', run: openFromAgent },
+    { label: 'Save to agent…', icon: 'cloud', run: saveToAgent },
+    '-',
+    { label: 'Load demo dashboard', icon: 'grid', run: async () => { if (await guardUnsaved()) { loadConfigObject(demoConfig()); } } },
+    { label: 'View config JSON', icon: 'file', run: () => openDialog({ title: 'Config JSON', wide: true, body: el('textarea', { class: 'inp mono', rows: 22, readonly: true, style: { width: '100%' } }, serializeConfig()),
+      foot: [el('button', { class: 'btn', text: 'Copy', onclick: () => copyText(serializeConfig()) }), el('button', { class: 'btn primary', text: 'Close', onclick: () => dlg.close() })] }) },
+  ]);
+}
+
+/* ------------------------------------------------------------------ toasts */
+function toast(text, kind = 'info') {
+  const t = el('div', { class: 'toast ' + kind, role: kind === 'err' ? 'alert' : 'status', html: icon(kind === 'ok' ? 'check' : kind === 'err' ? 'crit' : 'info') }, el('span', { text }));
+  $('#toasts').append(t);
+  setTimeout(() => t.remove(), kind === 'err' ? 7000 : 3500);
+}
+
+/* ------------------------------------------------------------------ wiring */
+function wire() {
+  $('#btnSide').innerHTML = icon('menu');
+  $('#btnSide').addEventListener('click', () => $('#sidebar').classList.toggle('open'));
+  $('#btnOpen').innerHTML = icon('open') + '<span>Open</span>';
+  $('#btnSave').innerHTML = icon('save') + '<span>Save</span>';
+  $('#btnFileMenu').innerHTML = icon('down');
+  $('#btnSettings').innerHTML = icon('settings');
+  $('#btnOpen').addEventListener('click', openConfigFile);
+  $('#btnSave').addEventListener('click', () => saveConfig(false));
+  $('#btnFileMenu').addEventListener('click', e => fileMenu(e.currentTarget));
+  $('#btnSettings').addEventListener('click', settingsDialog);
+  $('#btnPause').addEventListener('click', () => { state.paused = !state.paused; renderTopbar(); if (!state.paused) tick(); });
+  $('#btnTheme').addEventListener('click', () => {
+    const order = ['auto', 'light', 'dark'];
+    config.settings.theme = order[(order.indexOf(config.settings.theme) + 1) % 3];
+    applyTheme(); markDirty(); toast(`Theme: ${config.settings.theme === 'auto' ? 'match system' : config.settings.theme}`, 'info');
+  });
+  const sw = $('#selWindow');
+  sw.append(...WINDOWS.map(v => el('option', { value: v, text: v === 60 ? '1 hour' : `${v} min` })));
+  sw.addEventListener('change', () => { config.settings.windowMin = +sw.value; markDirty(); renderMain(); });
+  const sr = $('#selRefresh');
+  sr.append(...REFRESHES.map(v => el('option', { value: v, text: `Every ${v} s` })));
+  sr.addEventListener('change', () => { config.settings.refreshSec = +sr.value; markDirty(); restartPolling(); renderMain(); });
+  $('#cfgName').addEventListener('input', e => { config.name = e.target.value.slice(0, 80) || 'Dashboard'; document.title = `${config.name} · MultiMonitor`; markDirty(); });
+
+  document.addEventListener('keydown', e => {
+    const mod = e.ctrlKey || e.metaKey;
+    if (mod && e.key.toLowerCase() === 's') { e.preventDefault(); saveConfig(e.shiftKey); }
+    else if (mod && e.key.toLowerCase() === 'o') { e.preventDefault(); openConfigFile(); }
+    else if (e.key === ' ' && !dlg.open && (document.activeElement === document.body || document.activeElement === $('#main'))) { e.preventDefault(); $('#btnPause').click(); }
+  });
+  // drag & drop a config file anywhere
+  let dragDepth = 0;
+  const hasFiles = e => e.dataTransfer && [...e.dataTransfer.types].includes('Files');
+  addEventListener('dragenter', e => { if (hasFiles(e)) { dragDepth++; $('#dropOverlay').classList.add('on'); } });
+  addEventListener('dragleave', e => { if (hasFiles(e) && --dragDepth <= 0) { dragDepth = 0; $('#dropOverlay').classList.remove('on'); } });
+  addEventListener('dragover', e => { if (hasFiles(e)) e.preventDefault(); });
+  addEventListener('drop', async e => {
+    if (!hasFiles(e)) return;
+    e.preventDefault(); dragDepth = 0; $('#dropOverlay').classList.remove('on');
+    const f = e.dataTransfer.files[0];
+    if (!f) return;
+    if (!await guardUnsaved()) return;
+    try { loadConfigText(await f.text(), f.name, null); } catch (err) { toast(err.message, 'err'); }
+  });
+  addEventListener('beforeunload', e => { if (state.dirty) { e.preventDefault(); e.returnValue = ''; } });
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) scheduleRender(); });
+  addEventListener('scroll', () => { const tip = $('#tooltip'); tip.style.display = 'none'; }, { passive: true });
+}
+
+async function init() {
+  wire();
+  let restored = null;
+  try { restored = JSON.parse(localStorage.getItem(LS_KEY) || 'null'); } catch { /* ignore */ }
+  let startCfg = null;
+  if (restored && restored.config) {
+    try { startCfg = normalizeConfig(restored.config); state.fileName = restored.fileName || ''; state.dirty = !!restored.dirty; } catch { startCfg = null; }
+  }
+  config = startCfg || defaultConfig();
+  state.view = config.view;
+  applyTheme(); renderTopbar(); renderSidebar();
+  // Decide live vs demo before the first render so we don't flash a demo banner.
+  state.mode = 'live';
+  await startHubWatch();
+  if (!startCfg && state.mode === 'demo') { config = demoConfig(); state.view = 'overview'; renderTopbar(); renderSidebar(); }
+  renderMain();
+  restartPolling();
+  setInterval(() => { if (!state.paused && !document.hidden) scheduleRender(); }, 1000); // keeps time axes sliding smoothly
+}
+init();
+</script>
+</body>
+</html>

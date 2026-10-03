@@ -1,0 +1,53 @@
+{
+  "schema": "multimonitor-config",
+  "version": 1,
+  "name": "Sample web farm",
+  "settings": {
+    "mode": "auto",
+    "hubUrl": "",
+    "hubKey": "",
+    "refreshSec": 5,
+    "windowMin": 15,
+    "theme": "auto"
+  },
+  "customMetrics": [
+    {
+      "id": "custom.defaultsite",
+      "label": "Default Web Site connections",
+      "path": "\\Web Service(Default Web Site)\\Current Connections",
+      "unit": "count",
+      "agg": "sum",
+      "dir": "above",
+      "warn": 500,
+      "crit": 1000
+    }
+  ],
+  "machines": [
+    {
+      "id": "local",
+      "name": "This PC",
+      "host": "localhost",
+      "colorSlot": 0,
+      "metrics": ["cpu.total", "mem.used", "disk.busy", "net.total", "disk.free", "proc.cpu"]
+    },
+    {
+      "id": "web01",
+      "name": "Web 01",
+      "host": "WEB01",
+      "colorSlot": 1,
+      "roles": ["web"],
+      "metrics": ["cpu.total", "mem.used", "web.conn", "web.rps", "web.connSites", "asp.queued", "asp.errors", "custom.defaultsite"],
+      "thresholds": { "cpu.total": { "warn": 70, "crit": 85 } },
+      "layout": { "web.connSites": { "wide": true } }
+    },
+    {
+      "id": "sql01",
+      "name": "SQL 01",
+      "host": "SQL01",
+      "colorSlot": 2,
+      "roles": ["sql"],
+      "metrics": ["cpu.total", "mem.avail", "sql.batch", "sql.conn", "sql.ple", "sql.blocked", "disk.latency", "disk.iops"]
+    }
+  ],
+  "view": "overview"
+}
